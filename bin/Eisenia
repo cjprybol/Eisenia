@@ -1,0 +1,184 @@
+#!/usr/bin/env julia
+# push!(LOAD_PATH, joinpath(@__DIR__, "..", "src"))
+using ArgParse
+using Eisenia
+
+function parse_commandline()
+    settings = ArgParseSettings()
+    settings.description = "kmer-based graph sequence assembly, analysis, identification, and quantification"
+    settings.version = "0.0.0"
+    settings.add_version = true
+
+    @add_arg_table settings begin
+        "stream-kmers"
+            help = "stream kmers"
+            action = :command
+       "plot"
+           help = "generate plots"
+           action = :command
+#        "assemble"
+#            help = "assemble a sequence graph"
+#            action = :command
+#        "map"
+#            help = "map sequences onto a sequence graph"
+#            action = :command
+#        "simulate"
+#            help = "simulate sequences"
+#            action = :command
+#        "test"
+#            help = "run tests"
+#            action = :command
+    end
+
+    settings["stream-kmers"].description = ""
+    @add_arg_table settings["stream-kmers"] begin
+        "--k"
+            help = "size of k"
+            required = true
+            arg_type = Int
+        "--fastq"
+            help = "one or more fastq sequence files, can be gzipped"
+            arg_type = String
+            nargs = '*'
+        "--fasta"
+            help = "one or more fasta sequence files, can be gzipped"
+            arg_type = String
+            nargs = '*'
+    end
+
+   settings["plot"].description = ""
+   @add_arg_table settings["plot"] begin
+       "histogram"
+           help = "plot a histogram of kmer counts"
+           action = :command
+       "rank-frequency"
+            help = "plot the rank-frequency zipfs law relationship of kmer counts"
+            action = :command
+       "gfa"
+           help = "render a sequence graph as an SVG"
+           action = :command
+   end
+
+   settings["plot"]["histogram"].description = ""
+   @add_arg_table settings["plot"]["histogram"] begin
+       "--histogram"
+           help = "kmer counts histogram file to plot"
+           arg_type = String
+   end
+
+   settings["plot"]["rank-frequency"].description = ""
+   @add_arg_table settings["plot"]["rank-frequency"] begin
+       "--kmer-counts"
+           help = "kmer counts file to plot"
+           arg_type = String
+   end
+
+   settings["plot"]["gfa"].description = ""
+   @add_arg_table settings["plot"]["gfa"] begin
+       "--gfa"
+           help = "gfa file to plot"
+           arg_type = String
+   end
+
+#    settings["assemble"].description = ""
+#    @add_arg_table settings["assemble"] begin
+#        "--kmers"
+#            help = "sorted file of trusted kmers"
+#            arg_type = String
+#            required = true
+#        "--sequences"
+#            help = """
+#                   One or more paths to fasta or fastq files.
+#
+#                   Sequences will be used for determining edges between kmers
+#                   and depth of coverage for kmers and resulting segments in the
+#                   GFA graph
+#                   """
+#            arg_type = String
+#            nargs = '*'
+#        "--colors"
+#            help = """
+#                   Paths to files that represent the color groups for the colored debruijn graphs.
+#
+#                   Each file contains a list of fastq and/or fasta files. Segments will be colored
+#                   using the tag CL:Z:# in the output GFA file, where # is an interger representing
+#                   the order of the color groups as they were presented in the command line.
+#                   """
+#            arg_type = String
+#            nargs = '*'
+#    end
+#
+#    settings["map"].description = ""
+#    @add_arg_table settings["map"] begin
+#        "--kmer-map"
+#            help = "joined table mapping kmers in the assemled untigs to kmers in the reads that generated the dataset"
+#            arg_type = String
+#            required = true
+#    end
+#
+#
+#
+#    settings["simulate"].description = ""
+#    @add_arg_table settings["simulate"] begin
+#        "fasta"
+#            help = "simulate one or more fasta sequences"
+#            action = :command
+#        "fastq"
+#            help = "simulate one or more fastq sequences"
+#            action = :command
+#    end
+#
+#    settings["simulate"]["fasta"].description = ""
+#    @add_arg_table settings["simulate"]["fasta"] begin
+#        "--seed"
+#            help = "seed for the random number generator"
+#            default = 0
+#            arg_type = Int
+#        "--length"
+#            help = "length(s) of fasta sequence(s) to generate"
+#            arg_type = Int
+#            nargs = '*'
+#            required = true
+#    end
+
+    return parse_args(settings)
+end
+
+function main()
+    parsed_args = parse_commandline()
+    if parsed_args["%COMMAND%"] == "stream-kmers"
+        k = parsed_args["stream-kmers"]["k"]
+        for fastq in parsed_args["stream-kmers"]["fastq"]
+            Eisenia.stream_kmers(fastq, k)
+        end
+        for fasta in parsed_args["stream-kmers"]["fasta"]
+            Eisenia.stream_kmers(fasta, k)
+        end
+    elseif parsed_args["%COMMAND%"] == "plot"
+        if parsed_args["plot"]["%COMMAND%"] == "gfa"
+            Eisenia.plot_gfa(parsed_args["plot"]["gfa"])
+        elseif parsed_args["plot"]["%COMMAND%"] == "histogram"
+            Eisenia.plot_histogram(parsed_args["plot"]["histogram"])
+        elseif parsed_args["plot"]["%COMMAND%"] == "rank-frequency"
+            Eisenia.plot_histogram(parsed_args["plot"]["rank-frequency"])
+        end
+    # elseif parsed_args["%COMMAND%"] == "assemble"
+    #     Eisenia.assemble(parsed_args["assemble"])
+    # elseif parsed_args["%COMMAND%"] == "index"
+    #     Eisenia.index(parsed_args["index"])
+    # elseif parsed_args["%COMMAND%"] == "map"
+    #     Eisenia.map(parsed_args["map"])
+    # elseif parsed_args["%COMMAND%"] == "simulate"
+    #     Eisenia.simulate(parsed_args["simulate"])
+    #     if parsed_args["simulate"]["%COMMAND%"] == "fasta"
+    #         Eisenia.simulate(parsed_args["simulate"]["fasta"])
+    #     elseif parsed_args["simulate"]["%COMMAND%"] == "fastq"
+    #         @error "not yet implemented"
+    #     end
+    # elseif parsed_args["%COMMAND%"] == "test"
+    #     runtests_file = joinpath(@__DIR__, "..", "test", "runtests.jl")
+    #     run(`julia --color yes $runtests_file`)
+    end
+end
+
+main()
