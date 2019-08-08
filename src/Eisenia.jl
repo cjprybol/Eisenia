@@ -1189,12 +1189,21 @@ function build_stranded_kmer_graph(canonical_kmers, observations)
     return stranded_kmer_graph
 end
 
-function stream_kmers(file, k)
+function stream_kmers(file, k, _canonical)
     filetype = determine_file_type(file)
-    for record in filetype.Reader(open_file(file))
-        seq = filetype.sequence(record)
-        for i in 1:length(seq)-k+1
-            println(stdout, canonical(view(seq, i:i+k-1)))
+    if _canonical
+        for record in filetype.Reader(open_file(file))
+            seq = filetype.sequence(record)
+            for i in 1:length(seq)-k+1
+                println(stdout, canonical(view(seq, i:i+k-1)))
+            end
+        end
+    else
+        for record in filetype.Reader(open_file(file))
+            seq = filetype.sequence(record)
+            for i in 1:length(seq)-k+1
+                println(stdout, view(seq, i:i+k-1))
+            end
         end
     end
 end

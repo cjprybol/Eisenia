@@ -47,6 +47,10 @@ function parse_commandline()
             help = "one or more fasta sequence files, can be gzipped"
             arg_type = String
             nargs = '*'
+        "--canonical"
+            help = "return the canonical kmers"
+            arg_type = Bool
+            default = true
     end
 
     settings["plot"].description = ""
@@ -190,10 +194,10 @@ function main()
     if parsed_args["%COMMAND%"] == "stream-kmers"
         k = parsed_args["stream-kmers"]["k"]
         for fastq in parsed_args["stream-kmers"]["fastq"]
-            Eisenia.stream_kmers(fastq, k)
+            Eisenia.stream_kmers(fastq, k, parsed_args["stream-kmers"]["canonical"])
         end
         for fasta in parsed_args["stream-kmers"]["fasta"]
-            Eisenia.stream_kmers(fasta, k)
+            Eisenia.stream_kmers(fasta, k, parsed_args["stream-kmers"]["canonical"])
         end
     elseif parsed_args["%COMMAND%"] == "plot"
         if parsed_args["plot"]["%COMMAND%"] == "gfa"
