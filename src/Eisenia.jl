@@ -70,6 +70,21 @@ end
 """
 document me
 """
+function sample_reads(parsed_args)
+    if endswith(parsed_args["fasta"], ".gz")
+        @error "please decompress the file fasta file and index with samtools faidx to allow quick sequence querying"
+    end
+    if !isfile(parsed_args["fasta"] * ".fai")
+        @error "please index using samtools faidx to allow quick sequence querying"
+    end
+    @show parsed_args
+    fasta_file = open_file(parsed_args["fasta"])
+
+end
+
+"""
+document me
+"""
 function canonical(sequence)
     sequence′ = reverse_complement(sequence)
     return sequence < sequence′ ? sequence : sequence′
@@ -1241,7 +1256,7 @@ function plot_histogram(parsed_args)
                 Y,
                 xlims = (-0.5, maximum(X)+0.5),
                 ylims = (-0.5, maximum(Y)+0.5),
-                title=parsed_args["histogram"],
+                title=basename(parsed_args["histogram"]),
                 titlefontsize=11,
                 xlabel="log2(depth of coverage)",
                 ylabel="log2(# kmers)",
@@ -1280,7 +1295,7 @@ function plot_rank_frequency(parsed_args)
                     Y,
                     xlims = (-0.5, maximum(X)+0.5),
                     ylims = (-0.5, maximum(Y)+0.5),
-                    title=parsed_args["kmer-counts"],
+                    title=basename(parsed_args["kmer-counts"]),
                     titlefontsize=11,
                     xlabel="log2(rank)",
                     ylabel="log2(count)",

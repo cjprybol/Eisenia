@@ -16,6 +16,9 @@ function parse_commandline()
        "plot"
            help = "generate plots"
            action = :command
+       "sample-reads"
+           help = "generate reads from a FASTA file"
+           action = :command
 #        "assemble"
 #            help = "assemble a sequence graph"
 #            action = :command
@@ -46,40 +49,66 @@ function parse_commandline()
             nargs = '*'
     end
 
-   settings["plot"].description = ""
-   @add_arg_table settings["plot"] begin
-       "histogram"
-           help = "plot a histogram of kmer counts"
-           action = :command
-       "rank-frequency"
+    settings["plot"].description = ""
+    @add_arg_table settings["plot"] begin
+        "histogram"
+            help = "plot a histogram of kmer counts"
+            action = :command
+        "rank-frequency"
             help = "plot the rank-frequency zipfs law relationship of kmer counts"
             action = :command
-       "gfa"
-           help = "render a sequence graph as an SVG"
-           action = :command
-   end
+        "gfa"
+            help = "render a sequence graph as an SVG"
+            action = :command
+    end
 
-   settings["plot"]["histogram"].description = ""
-   @add_arg_table settings["plot"]["histogram"] begin
-       "--histogram"
-           help = "kmer counts histogram file to plot"
-           arg_type = String
-   end
+    settings["plot"]["histogram"].description = ""
+    @add_arg_table settings["plot"]["histogram"] begin
+        "--histogram"
+            help = "kmer counts histogram file to plot"
+            arg_type = String
+            required = true
+    end
 
-   settings["plot"]["rank-frequency"].description = ""
-   @add_arg_table settings["plot"]["rank-frequency"] begin
-       "--kmer-counts"
-           help = "kmer counts file to plot"
-           arg_type = String
-   end
+    settings["plot"]["rank-frequency"].description = ""
+    @add_arg_table settings["plot"]["rank-frequency"] begin
+        "--kmer-counts"
+            help = "kmer count file to plot"
+            arg_type = String
+            required = true
+    end
 
-   settings["plot"]["gfa"].description = ""
-   @add_arg_table settings["plot"]["gfa"] begin
-       "--gfa"
-           help = "gfa file to plot"
-           arg_type = String
-   end
+    settings["plot"]["gfa"].description = ""
+    @add_arg_table settings["plot"]["gfa"] begin
+        "--gfa"
+            help = "gfa file to plot"
+            arg_type = String
+            required = true
+    end
 
+    settings["sample-reads"].description = ""
+    @add_arg_table settings["sample-reads"] begin
+        "--fasta"
+            help = "a fasta sequence file, shouldn't be gzipped"
+            arg_type = String
+            required = true
+        "--read-length"
+            help = "mean read length"
+            arg_type = Int
+            default = 150
+        "--standard-deviation"
+            help = "standard deviation of read length"
+            arg_type = Float64
+            default = 0.0
+        "--read-number"
+            help = "number of reads"
+            arg_type = Int
+            default = 1
+        "--error-rate"
+            help = "error rate of the reads"
+            arg_type = Float64
+            default = 0.0
+    end
 #    settings["assemble"].description = ""
 #    @add_arg_table settings["assemble"] begin
 #        "--kmers"
@@ -162,6 +191,8 @@ function main()
         elseif parsed_args["plot"]["%COMMAND%"] == "rank-frequency"
             Eisenia.plot_histogram(parsed_args["plot"]["rank-frequency"])
         end
+    elseif parsed_args["%COMMAND%"] == "sample-reads"
+        Eisenia.sample_reads(parsed_args["sample-reads"])
     # elseif parsed_args["%COMMAND%"] == "assemble"
     #     Eisenia.assemble(parsed_args["assemble"])
     # elseif parsed_args["%COMMAND%"] == "index"
