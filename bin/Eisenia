@@ -89,25 +89,37 @@ function parse_commandline()
     settings["sample-reads"].description = ""
     @add_arg_table settings["sample-reads"] begin
         "--fasta"
-            help = "a fasta sequence file, shouldn't be gzipped"
+            help = "A fasta sequence file, shouldn't be gzipped."
             arg_type = String
             required = true
         "--read-length"
-            help = "mean read length"
+            help = "Mean read length."
             arg_type = Int
             default = 150
-        "--standard-deviation"
-            help = "standard deviation of read length"
+        "--standard-deviation-read-length"
+            help = "Standard deviation of read length."
             arg_type = Float64
             default = 0.0
         "--read-number"
-            help = "number of reads"
+            help = "Number of reads."
             arg_type = Int
             default = 1
         "--error-rate"
-            help = "error rate of the reads"
+            help = "Error rate of the reads."
             arg_type = Float64
             default = 0.0
+        "--paired-end"
+            help = "Paired end reads?"
+            arg_type = Bool
+            default = false
+        "--fragment-size"
+            help = "Mean fragment size for paired end reads. Insert size = fragment size - (2 * read length)."
+            arg_type = Union{Int, Missing}
+            default = missing
+        "--standard-deviation-fragment-length"
+            help = "The standard deviation of the fragment size for paired-end-reads."
+            arg_type = Union{Float64, Missing}
+            default = missing
     end
 #    settings["assemble"].description = ""
 #    @add_arg_table settings["assemble"] begin

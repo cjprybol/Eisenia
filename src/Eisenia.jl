@@ -24,7 +24,7 @@ using ProgressMeter
 using Random
 using StaticArrays
 using Statistics
-# using StatsBase
+using StatsBase
 
 # must use master branch until floyd_warshall_shortest_paths PR I contributed is tagged as a version
 
@@ -33,7 +33,9 @@ const NUCLEOTIDES = [DNA_A, DNA_C, DNA_G, DNA_T]
 """
 document me
 """
-function observe(fasta_record; error_rate=0, read_length=length(FASTA.sequence(fasta_record)))
+function observe(fasta_record; error_rate=0,
+                 read_length = length(FASTA.sequence(fasta_record)),
+                 identifier_length = Int(round(log10(read_length)))+11)
     reference_sequence = FASTA.sequence(fasta_record)
     start_index = rand(1:length(reference_sequence)-read_length+1)
     sequence_range = start_index:start_index+read_length-1
@@ -63,7 +65,7 @@ function observe(fasta_record; error_rate=0, read_length=length(FASTA.sequence(f
             end
         end
     end
-    identifier = randstring(Int(round(log10(length(observed_sequence)))+3))
+    identifier = randstring(identifier_length)
     return FASTA.Record(identifier, observed_sequence)
 end
 
@@ -77,9 +79,30 @@ function sample_reads(parsed_args)
     if !isfile(parsed_args["fasta"] * ".fai")
         @error "please index using samtools faidx to allow quick sequence querying"
     end
-    @show parsed_args
-    fasta_file = open_file(parsed_args["fasta"])
-
+    if parsed_args["paired-end"] == true
+        @error "paired end isn't implemented yet"
+        # make sure that fragment length and fragment length standard deviation aren't missing
+    end
+    # @show parsed_args
+    # fasta_file = open_file(parsed_args["fasta"])
+    record_identifiers = [FASTA.identifier(record) for record in FASTA.Reader(Eisenia.open_file(parsed_args["fasta"]))]
+    sequence_lengths = [length(FASTA.sequence(record)) for record in FASTA.Reader(Eisenia.open_file(parsed_args["fasta"]))]
+    fasta_stream = FASTA.Reader(Eisenia.open_file(parsed_args["fasta"]), index=parsed_args["fasta"] * ".fai")
+    record_probabilities = Weights(sequence_lengths ./ sum(sequence_lengths))
+    if parsed_args["standard-deviation-read-length"] > 0.0
+        read_length_distribution = Normal(parsed_args["read-length"], parsed_args["standard-deviation-read-length"])
+    elseif parsed_args["standard-deviation-read-length"] < 0.0
+        @error "standard deviation must be positive"
+    else
+        read_length_distribution = parsed_args["read-length"]:parsed_args["read-length"]
+    end
+    for read in 1:parsed_args["read-number"]
+        record_to_sample = sample(record_identifiers, record_probabilities)
+        observation = observe(fasta_stream[record_to_sample];
+                              error_rate=parsed_args["error-rate"],
+                              read_length=Int(round(rand(read_length_distribution))))
+        println(observation)
+    end
 end
 
 """
