@@ -205,7 +205,7 @@ function main()
         elseif parsed_args["plot"]["%COMMAND%"] == "histogram"
             Eisenia.plot_histogram(parsed_args["plot"]["histogram"])
         elseif parsed_args["plot"]["%COMMAND%"] == "rank-frequency"
-            Eisenia.plot_histogram(parsed_args["plot"]["rank-frequency"])
+            Eisenia.plot_rank_frequency(parsed_args["plot"]["rank-frequency"])
         end
     elseif parsed_args["%COMMAND%"] == "sample-reads"
         Eisenia.sample_reads(parsed_args["sample-reads"])
