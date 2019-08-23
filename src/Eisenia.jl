@@ -26,8 +26,6 @@ using StaticArrays
 using Statistics
 using StatsBase
 
-# must use master branch until floyd_warshall_shortest_paths PR I contributed is tagged as a version
-
 const NUCLEOTIDES = [DNA_A, DNA_C, DNA_G, DNA_T]
 
 """
@@ -1195,14 +1193,14 @@ function stream_kmers(file, k, _canonical)
         for record in filetype.Reader(open_file(file))
             seq = filetype.sequence(record)
             for i in 1:length(seq)-k+1
-                println(stdout, canonical(view(seq, i:i+k-1)))
+                println(stdout, canonical(seq[i:i+k-1]))
             end
         end
     else
         for record in filetype.Reader(open_file(file))
             seq = filetype.sequence(record)
             for i in 1:length(seq)-k+1
-                println(stdout, view(seq, i:i+k-1))
+                println(stdout, seq[i:i+k-1])
             end
         end
     end
