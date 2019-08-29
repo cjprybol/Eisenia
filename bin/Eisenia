@@ -10,47 +10,15 @@ function parse_commandline()
     settings.add_version = true
 
     @add_arg_table settings begin
-        "stream-kmers"
-            help = "stream kmers"
-            action = :command
        "plot"
            help = "generate plots"
-           action = :command
-       "sample-reads"
-           help = "generate reads from a FASTA file"
            action = :command
 #        "assemble"
 #            help = "assemble a sequence graph"
 #            action = :command
-#        "map"
-#            help = "map sequences onto a sequence graph"
-#            action = :command
-#        "simulate"
-#            help = "simulate sequences"
-#            action = :command
 #        "test"
 #            help = "run tests"
 #            action = :command
-    end
-
-    settings["stream-kmers"].description = ""
-    @add_arg_table settings["stream-kmers"] begin
-        "--k"
-            help = "size of k"
-            required = true
-            arg_type = Int
-        "--fastq"
-            help = "one or more fastq sequence files, can be gzipped"
-            arg_type = String
-            nargs = '*'
-        "--fasta"
-            help = "one or more fasta sequence files, can be gzipped"
-            arg_type = String
-            nargs = '*'
-        "--canonical"
-            help = "return the canonical kmers"
-            arg_type = Bool
-            default = true
     end
 
     settings["plot"].description = ""
@@ -90,41 +58,6 @@ function parse_commandline()
             required = true
     end
 
-    settings["sample-reads"].description = ""
-    @add_arg_table settings["sample-reads"] begin
-        "--fasta"
-            help = "A fasta sequence file, shouldn't be gzipped."
-            arg_type = String
-            required = true
-        "--read-length"
-            help = "Mean read length."
-            arg_type = Int
-            default = 150
-        "--standard-deviation-read-length"
-            help = "Standard deviation of read length."
-            arg_type = Float64
-            default = 0.0
-        "--read-number"
-            help = "Number of reads."
-            arg_type = Int
-            default = 1
-        "--error-rate"
-            help = "Error rate of the reads."
-            arg_type = Float64
-            default = 0.0
-        "--paired-end"
-            help = "Paired end reads?"
-            arg_type = Bool
-            default = false
-        "--fragment-size"
-            help = "Mean fragment size for paired end reads. Insert size = fragment size - (2 * read length)."
-            arg_type = Union{Int, Missing}
-            default = missing
-        "--standard-deviation-fragment-length"
-            help = "The standard deviation of the fragment size for paired-end-reads."
-            arg_type = Union{Float64, Missing}
-            default = missing
-    end
 #    settings["assemble"].description = ""
 #    @add_arg_table settings["assemble"] begin
 #        "--kmers"
@@ -152,54 +85,13 @@ function parse_commandline()
 #            arg_type = String
 #            nargs = '*'
 #    end
-#
-#    settings["map"].description = ""
-#    @add_arg_table settings["map"] begin
-#        "--kmer-map"
-#            help = "joined table mapping kmers in the assemled untigs to kmers in the reads that generated the dataset"
-#            arg_type = String
-#            required = true
-#    end
-#
-#
-#
-#    settings["simulate"].description = ""
-#    @add_arg_table settings["simulate"] begin
-#        "fasta"
-#            help = "simulate one or more fasta sequences"
-#            action = :command
-#        "fastq"
-#            help = "simulate one or more fastq sequences"
-#            action = :command
-#    end
-#
-#    settings["simulate"]["fasta"].description = ""
-#    @add_arg_table settings["simulate"]["fasta"] begin
-#        "--seed"
-#            help = "seed for the random number generator"
-#            default = 0
-#            arg_type = Int
-#        "--length"
-#            help = "length(s) of fasta sequence(s) to generate"
-#            arg_type = Int
-#            nargs = '*'
-#            required = true
-#    end
 
     return parse_args(settings)
 end
 
 function main()
     parsed_args = parse_commandline()
-    if parsed_args["%COMMAND%"] == "stream-kmers"
-        k = parsed_args["stream-kmers"]["k"]
-        for fastq in parsed_args["stream-kmers"]["fastq"]
-            Eisenia.stream_kmers(fastq, k, parsed_args["stream-kmers"]["canonical"])
-        end
-        for fasta in parsed_args["stream-kmers"]["fasta"]
-            Eisenia.stream_kmers(fasta, k, parsed_args["stream-kmers"]["canonical"])
-        end
-    elseif parsed_args["%COMMAND%"] == "plot"
+    if parsed_args["%COMMAND%"] == "plot"
         if parsed_args["plot"]["%COMMAND%"] == "gfa"
             Eisenia.plot_gfa(parsed_args["plot"]["gfa"])
         elseif parsed_args["plot"]["%COMMAND%"] == "histogram"
@@ -207,21 +99,8 @@ function main()
         elseif parsed_args["plot"]["%COMMAND%"] == "rank-frequency"
             Eisenia.plot_rank_frequency(parsed_args["plot"]["rank-frequency"])
         end
-    elseif parsed_args["%COMMAND%"] == "sample-reads"
-        Eisenia.sample_reads(parsed_args["sample-reads"])
     # elseif parsed_args["%COMMAND%"] == "assemble"
     #     Eisenia.assemble(parsed_args["assemble"])
-    # elseif parsed_args["%COMMAND%"] == "index"
-    #     Eisenia.index(parsed_args["index"])
-    # elseif parsed_args["%COMMAND%"] == "map"
-    #     Eisenia.map(parsed_args["map"])
-    # elseif parsed_args["%COMMAND%"] == "simulate"
-    #     Eisenia.simulate(parsed_args["simulate"])
-    #     if parsed_args["simulate"]["%COMMAND%"] == "fasta"
-    #         Eisenia.simulate(parsed_args["simulate"]["fasta"])
-    #     elseif parsed_args["simulate"]["%COMMAND%"] == "fastq"
-    #         @error "not yet implemented"
-    #     end
     # elseif parsed_args["%COMMAND%"] == "test"
     #     runtests_file = joinpath(@__DIR__, "..", "test", "runtests.jl")
     #     run(`julia --color yes $runtests_file`)

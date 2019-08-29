@@ -31,121 +31,6 @@ const NUCLEOTIDES = [DNA_A, DNA_C, DNA_G, DNA_T]
 """
 document me
 """
-function observe(fasta_record; error_rate=0,
-                 read_length = length(FASTA.sequence(fasta_record)),
-                 identifier_length = Int(round(log10(read_length)))+11)
-    reference_sequence = FASTA.sequence(fasta_record)
-    start_index = rand(1:length(reference_sequence)-read_length+1)
-    sequence_range = start_index:start_index+read_length-1
-    ## should record alignment info here for writing reference alignment information
-    reference_sequence_observation = view(reference_sequence, sequence_range)
-    if rand([:forward, :reverse_complement]) == :reverse_complement
-        reference_sequence_observation = reverse_complement(reference_sequence_observation)
-    end
-    if error_rate == 0
-        observed_sequence = reference_sequence_observation
-    else
-        observed_sequence = DNASequence()
-        for correct_base in reference_sequence_observation
-            is_an_error = Bool(rand(Bernoulli(error_rate)))
-            if is_an_error
-                error_type = rand([:mismatch, :insertion, :deletion])
-                if error_type == :mismatch
-                    push!(observed_sequence, rand(NUCLEOTIDES))
-                elseif error_type == :insertion
-                    push!(observed_sequence, rand(NUCLEOTIDES))
-                    push!(observed_sequence, correct_base)
-                elseif error_type == :deletion
-                    continue
-                end
-            else
-                push!(observed_sequence, correct_base)
-            end
-        end
-    end
-    identifier = randstring(identifier_length)
-    return FASTA.Record(identifier, observed_sequence)
-end
-
-"""
-document me
-"""
-function sample_reads(parsed_args)
-    if endswith(parsed_args["fasta"], ".gz")
-        @error "please decompress the file fasta file and index with samtools faidx to allow quick sequence querying"
-    end
-    if !isfile(parsed_args["fasta"] * ".fai")
-        @error "please index using samtools faidx to allow quick sequence querying"
-    end
-    if parsed_args["paired-end"] == true
-        @error "paired end isn't implemented yet"
-        # make sure that fragment length and fragment length standard deviation aren't missing
-    end
-    # @show parsed_args
-    # fasta_file = open_file(parsed_args["fasta"])
-    record_identifiers = [FASTA.identifier(record) for record in FASTA.Reader(Eisenia.open_file(parsed_args["fasta"]))]
-    sequence_lengths = [length(FASTA.sequence(record)) for record in FASTA.Reader(Eisenia.open_file(parsed_args["fasta"]))]
-    fasta_stream = FASTA.Reader(Eisenia.open_file(parsed_args["fasta"]), index=parsed_args["fasta"] * ".fai")
-    record_probabilities = Weights(sequence_lengths ./ sum(sequence_lengths))
-    if parsed_args["standard-deviation-read-length"] > 0.0
-        read_length_distribution = Normal(parsed_args["read-length"], parsed_args["standard-deviation-read-length"])
-    elseif parsed_args["standard-deviation-read-length"] < 0.0
-        @error "standard deviation must be positive"
-    else
-        read_length_distribution = parsed_args["read-length"]:parsed_args["read-length"]
-    end
-    for read in 1:parsed_args["read-number"]
-        record_to_sample = sample(record_identifiers, record_probabilities)
-        observation = observe(fasta_stream[record_to_sample];
-                              error_rate=parsed_args["error-rate"],
-                              read_length=Int(round(rand(read_length_distribution))))
-        println(observation)
-    end
-end
-
-"""
-document me
-"""
-function canonical(sequence)
-    sequence′ = reverse_complement(sequence)
-    return sequence < sequence′ ? sequence : sequence′
-end
-
-"""
-document me
-"""
-function count_canonical_kmers(observation::FASTA.Record, k::Int)
-    kmer_counts = Dict{DNASequence, Int}()
-    sequence = FASTA.sequence(observation)
-    for i in 1:length(sequence)-k+1
-        kmer = canonical(sequence[i:i+k-1])
-        if kmer in keys(kmer_counts)
-            kmer_counts[kmer] += 1
-        else
-            kmer_counts[kmer] = 1
-        end
-    end
-    return OrderedDict{DNASequence, Int}(key => kmer_counts[key] for key in sort!(collect(keys(kmer_counts))))
-end
-
-"""
-document me
-"""
-function count_canonical_kmers(observations, k::Int)
-    kmer_counts = count_canonical_kmers(first(observations), k)
-    for observation_index in 2:length(observations)
-        observation = observations[observation_index]
-        observation_kmer_counts = count_canonical_kmers(observation, k)
-        merge!(+, kmer_counts, observation_kmer_counts)
-    end
-    # @assert issorted(keys(kmer_counts)) && kmer_counts isa OrderedDict
-    # return kmer_counts
-    return OrderedDict(key => kmer_counts[key] for key in sort!(collect(keys(kmer_counts))))
-end
-
-"""
-document me
-"""
 function sequence_to_stranded_path(stranded_kmers, sequence)
     k = length(first(stranded_kmers))
     path = Vector{Int}()
@@ -1029,22 +914,6 @@ function UPGMA(distance_matrix)
     return tree
 end
 
-# """
-# document me
-#
-# refactor to reuse code better
-# """
-# function kmer_profile(kmers, fasta)
-#     k = length(first(kmers))
-#     kmer_counts = SortedDict(kmer => 0 for kmer in kmers)
-#     for record in FASTA.Reader(open(fasta))
-#         for i in 1:length(FASTA.sequence(record)) - k + 1
-#             kmer_counts[canonical(FASTA.sequence(record)[i:i+k-1])] += 1
-#         end
-#     end
-#     return values(kmer_counts) ./ sum(values(kmer_counts))
-# end
-
 # add color by file, color by group options later
 # function build_stranded_kmer_graph(canonical_kmer_file,
 #                                    observations,
@@ -1185,25 +1054,6 @@ function build_stranded_kmer_graph(canonical_kmers, observations)
         end
     end
     return stranded_kmer_graph
-end
-
-function stream_kmers(file, k, _canonical)
-    filetype = determine_file_type(file)
-    if _canonical
-        for record in filetype.Reader(open_file(file))
-            seq = filetype.sequence(record)
-            for i in 1:length(seq)-k+1
-                println(stdout, canonical(seq[i:i+k-1]))
-            end
-        end
-    else
-        for record in filetype.Reader(open_file(file))
-            seq = filetype.sequence(record)
-            for i in 1:length(seq)-k+1
-                println(stdout, seq[i:i+k-1])
-            end
-        end
-    end
 end
 
 function determine_file_type(file)
