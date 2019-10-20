@@ -1,32 +1,46 @@
 module Eisenia
 
-using Reexport
-using ArgParse
-using BioAlignments
-@reexport using BioSequences
-using CodecZlib
-using Colors
-using ColorSchemes
-using DataFrames
-using DataStructures
-using Dates
-using Distances
-using Distributions
-using GLM
-using IterTools
-using JLD2
-@reexport using LightGraphs
-using Luxor
-using Mmap
-using MetaGraphs
-using Plots
-using ProgressMeter
-using Random
-using StaticArrays
-using Statistics
-using StatsBase
+# import Reexport
+# import ArgParse
+# for finding the distances between kmers
+import BioAlignments
+# @reexport import BioSequences
+# for all sequence useage
+import BioSequences
+# for reading and writing gzipped fasta/fastq
+import CodecZlib
+# for managing colors in graph plots
+import Colors
+# for colorschemes used in graph plots
+# import ColorSchemes
+import DataFrames
+# import DataStructures
+# import Dates
+# import Distances
+# import Distributions
+import GLM
+# import IterTools
+# import JLD2
+# @reexport import LightGraphs
+# for representing genome graphs
+import LightGraphs
+# for drawing graph plots
+import Luxor
+# import Mmap
+# for handling metadata with genome graphs
+import MetaGraphs
+import Plots
+# import ProgressMeter
+import Random
+# import StaticArrays
+import Statistics
+# import StatsBase
 
-const NUCLEOTIDES = [DNA_A, DNA_C, DNA_G, DNA_T]
+const NUCLEOTIDES =
+    [BioSequences.DNA_A,
+     BioSequences.DNA_C,
+     BioSequences.DNA_G, 
+     BioSequences.DNA_T]
 
 """
 document me
@@ -58,9 +72,9 @@ end
 # Compute the probability of an edge relative to all edges of a given source vertex
 # """
 function edge_probability(stranded_kmer_graph, edge)
-    neighbors = outneighbors(stranded_kmer_graph, edge.src)
+    neighbors = LightGraphs.outneighbors(stranded_kmer_graph, edge.src)
     neighbor_under_consideration = findfirst(neighbor -> neighbor == edge.dst, neighbors)
-    edge_weights = [length(stranded_kmer_graph.eprops[Edge(edge.src, neighbor)][:coverage]) for neighbor in neighbors]
+    edge_weights = [length(stranded_kmer_graph.eprops[LightGraphs.Edge(edge.src, neighbor)][:coverage]) for neighbor in neighbors]
     if sum(edge_weights) == 0
         p = 0.0
     else
@@ -76,8 +90,8 @@ end
 #
 #
 # ```jldoctest
-# using Primes
-# julia> for prime in primes(3, 101)
+# import Primes
+# julia> for prime in Primes.primes(3, 101)
 #            println("$prime assumes accuracy of $(1-1/(prime + 1))")
 #        end
 # 3 assumes accuracy of 0.6666666666666667
@@ -118,7 +132,7 @@ function viterbi_maximum_likelihood_traversals(stranded_kmer_graph;
     if verbosity in ["debug", "reads", "dataset"]
         println("computing kmer counts...")
     end
-    stranded_kmer_counts = [length(stranded_kmer_graph.vprops[vertex][:coverage]) for vertex in vertices(stranded_kmer_graph)]
+    stranded_kmer_counts = [length(stranded_kmer_graph.vprops[vertex][:coverage]) for vertex in LightGraphs.vertices(stranded_kmer_graph)]
     if verbosity in ["debug", "reads", "dataset"]
         println("computing kmer state likelihoods...")
     end
@@ -128,7 +142,7 @@ function viterbi_maximum_likelihood_traversals(stranded_kmer_graph;
     if verbosity in ["debug"]
         println("STATE LIKELIHOODS:")
         println("\tkmer\tcount\tlikelihood")
-        for vertex in vertices(stranded_kmer_graph)
+        for vertex in LightGraphs.vertices(stranded_kmer_graph)
             kmer = stranded_kmer_graph.gprops[:stranded_kmers][vertex]
             count = stranded_kmer_counts[vertex]
             likelihood = stranded_kmer_likelihoods[vertex]
@@ -149,7 +163,7 @@ function viterbi_maximum_likelihood_traversals(stranded_kmer_graph;
                     u = shortest_path[ui]
                     v = shortest_path[ui + 1]
                     # likelihood of the transition
-                    path_likelihood *= edge_probability(stranded_kmer_graph, Edge(u, v))
+                    path_likelihood *= edge_probability(stranded_kmer_graph, LightGraphs.Edge(u, v))
                 end
                 if path_likelihood == 0.0
                     shortest_paths[K1][K2] = Vector{Int}()
@@ -157,15 +171,15 @@ function viterbi_maximum_likelihood_traversals(stranded_kmer_graph;
             elseif K1 == K2
                 # the shortest path from a kmer to itself is an insertion (no edge)
                 # so need to manually check for self loops
-                if has_edge(stranded_kmer_graph, Edge(K1, K2))
-                    if edge_probability(stranded_kmer_graph, Edge(K1, K2)) != 0.0
+                if LightGraphs.has_edge(stranded_kmer_graph, LightGraphs.Edge(K1, K2))
+                    if edge_probability(stranded_kmer_graph, LightGraphs.Edge(K1, K2)) != 0.0
                         shortest_paths[K1][K2] = [K1, K2]
                     else
                         shortest_paths[K1][K2] = Vector{Int}()
                     end
                 # otherwise, check to see if any outneighbors connect back to the kmer
                 else
-                    connected_outneighbors = filter(outneighbor -> has_path(stranded_kmer_graph, outneighbor, K2), outneighbors(stranded_kmer_graph, K1))
+                    connected_outneighbors = filter(outneighbor -> has_path(stranded_kmer_graph, outneighbor, K2), LightGraphs.outneighbors(stranded_kmer_graph, K1))
                     if !isempty(connected_outneighbors)
                         outneighbor_cycles = [[K1, shortest_paths[outneighbor][K2]...] for outneighbor in connected_outneighbors]
                         cycle_likelihoods = ones(length(outneighbor_cycles))
@@ -174,7 +188,7 @@ function viterbi_maximum_likelihood_traversals(stranded_kmer_graph;
                                 u = cycle[ui]
                                 v = cycle[ui + 1]
                                 # likelihood of the transition
-                                cycle_likelihoods[i] *= edge_probability(stranded_kmer_graph, Edge(u, v))
+                                cycle_likelihoods[i] *= edge_probability(stranded_kmer_graph, LightGraphs.Edge(u, v))
                             end
                             # include likelihoods of states
                             for vertex in cycle[2:end-1]
@@ -206,7 +220,7 @@ function viterbi_maximum_likelihood_traversals(stranded_kmer_graph;
     total_bases_observed = 0
     total_edits_accepted = 0
 
-    corrected_observations = FASTA.Record[]
+    corrected_observations = BioSequences.FASTA.Record[]
     if verbosity in ["debug", "reads", "dataset"]
         println("finding viterbi maximum likelihood paths for observed sequences...")
     end
@@ -216,12 +230,12 @@ function viterbi_maximum_likelihood_traversals(stranded_kmer_graph;
             println("\nevaluating sequence $observation_index of $(length(stranded_kmer_graph.gprops[:observed_paths]))")
         end
         # consider switching to log transform
-        kmer_likelihoods = zeros(nv(stranded_kmer_graph), length(observed_path))
-        kmer_arrival_paths = Array{Vector{Int}}(undef, nv(stranded_kmer_graph), length(observed_path))
-        edit_distances = zeros(Int, nv(stranded_kmer_graph), length(observed_path))
+        kmer_likelihoods = zeros(LightGraphs.nv(stranded_kmer_graph), length(observed_path))
+        kmer_arrival_paths = Array{Vector{Int}}(undef, LightGraphs.nv(stranded_kmer_graph), length(observed_path))
+        edit_distances = zeros(Int, LightGraphs.nv(stranded_kmer_graph), length(observed_path))
         observed_kmer_index = observed_path[1]
         observed_kmer_sequence = stranded_kmer_graph.gprops[:stranded_kmers][observed_kmer_index]
-        for hidden_kmer_index in vertices(stranded_kmer_graph)
+        for hidden_kmer_index in LightGraphs.vertices(stranded_kmer_graph)
             hidden_kmer_sequence = stranded_kmer_graph.gprops[:stranded_kmers][hidden_kmer_index]
             alignment_result = pairalign(LevenshteinDistance(), observed_kmer_sequence, hidden_kmer_sequence)
             number_of_matches = count_matches(alignment(alignment_result))
@@ -366,7 +380,7 @@ function viterbi_maximum_likelihood_traversals(stranded_kmer_graph;
         total_edits_accepted += maximum_likelihood_edit_distance
         id = stranded_kmer_graph.gprops[:observation_ids][observation_index]
         kmer_stamped_id = id * "_" * string(stranded_kmer_graph.gprops[:k])
-        push!(corrected_observations, FASTA.Record(kmer_stamped_id, maximum_likelihood_sequence))
+        push!(corrected_observations, BioSequences.FASTA.Record(kmer_stamped_id, maximum_likelihood_sequence))
         # progress meter
         # next!(p)
     end
@@ -380,21 +394,21 @@ function viterbi_maximum_likelihood_traversals(stranded_kmer_graph;
     return corrected_observations
 end
 
-function plot_stranded_kmer_graph(stranded_kmer_graph; filename=randstring(MersenneTwister(Int(round(time()))), 3) * ".svg")
+function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstring(Random.MersenneTwister(Int(round(time()))), 3) * ".svg")
     canonical_vertices = [i for (i, kmer) in enumerate(stranded_kmer_graph.gprops[:stranded_kmers]) if stranded_kmer_graph.gprops[:reverse_complement_map][i] > i]
     vertex_ordered_pairs = [(plus => minus) for (plus, minus) in zip(canonical_vertices, stranded_kmer_graph.gprops[:reverse_complement_map][canonical_vertices])]
-    stranded_vertex_to_unstranded_vertex_map = [findfirst(vertex_ordered_pair -> vertex in vertex_ordered_pair, vertex_ordered_pairs) for vertex in vertices(stranded_kmer_graph)]
+    stranded_vertex_to_unstranded_vertex_map = [findfirst(vertex_ordered_pair -> vertex in vertex_ordered_pair, vertex_ordered_pairs) for vertex in LightGraphs.vertices(stranded_kmer_graph)]
 
-    canonical_kmer_graph = SimpleGraph(length(vertex_ordered_pairs))
+    canonical_kmer_graph = LightGraphs.SimpleGraph(length(vertex_ordered_pairs))
 
     for vertex_ordered_pair in vertex_ordered_pairs
         plus = first(vertex_ordered_pair)
         minus = last(vertex_ordered_pair)
-        for plus_strand_neighbor in [inneighbors(stranded_kmer_graph, plus)..., outneighbors(stranded_kmer_graph, plus)...]
-            add_edge!(canonical_kmer_graph, stranded_vertex_to_unstranded_vertex_map[plus], stranded_vertex_to_unstranded_vertex_map[plus_strand_neighbor])
+        for plus_strand_neighbor in [LightGraphs.inneighbors(stranded_kmer_graph, plus)..., LightGraphs.outneighbors(stranded_kmer_graph, plus)...]
+            LightGraphs.add_edge!(canonical_kmer_graph, stranded_vertex_to_unstranded_vertex_map[plus], stranded_vertex_to_unstranded_vertex_map[plus_strand_neighbor])
         end
-        for minus_strand_neighbor in [inneighbors(stranded_kmer_graph, minus)..., outneighbors(stranded_kmer_graph, minus)...]
-            add_edge!(canonical_kmer_graph, stranded_vertex_to_unstranded_vertex_map[minus], stranded_vertex_to_unstranded_vertex_map[minus_strand_neighbor])
+        for minus_strand_neighbor in [LightGraphs.inneighbors(stranded_kmer_graph, minus)..., LightGraphs.outneighbors(stranded_kmer_graph, minus)...]
+            LightGraphs.add_edge!(canonical_kmer_graph, stranded_vertex_to_unstranded_vertex_map[minus], stranded_vertex_to_unstranded_vertex_map[minus_strand_neighbor])
         end
     end
 
@@ -406,9 +420,9 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=randstring(Merse
     current_global_x_max = 0
     current_global_y_max = 0
 
-    stranded_vertex_coordinates = [Dict{Symbol, Any}() for vertex in vertices(stranded_kmer_graph)]
+    stranded_vertex_coordinates = [Dict{Symbol, Any}() for vertex in LightGraphs.vertices(stranded_kmer_graph)]
 
-    for connected_component in connected_components(canonical_kmer_graph)
+    for connected_component in LightGraphs.connected_components(canonical_kmer_graph)
         # reset xmin to left-align new contigs
         current_contig_x_min = current_global_x_min
         current_contig_x_max = current_global_x_min
@@ -416,7 +430,7 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=randstring(Merse
         current_contig_y_max = current_global_y_max
         ## TODO could also achor by vertex with the smallest indegree
         anchor = minimum(connected_component)
-        canonical_bfs_tree = bfs_tree(canonical_kmer_graph, anchor)
+        canonical_bfs_tree = LightGraphs.bfs_tree(canonical_kmer_graph, anchor)
         vertices_in_current_depth_of_field = [anchor]
         while !isempty(vertices_in_current_depth_of_field)
             vertices_in_next_depth_of_field = Vector{Int}()
@@ -455,7 +469,7 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=randstring(Merse
                 svcp[:xin] = svcp[:xmin]
                 svcp[:xout] = svcp[:xmax]
                 svcp[:coverage_to_y_map] = [svcp[:ymin] + radius + i for i in 1:plus_coverage]
-                svcp[:center] = Point(mean((svcp[:xmin], svcp[:xmax])), mean((svcp[:ymin], svcp[:ymax])))
+                svcp[:center] = Luxor.Point(Statistics.mean((svcp[:xmin], svcp[:xmax])), Statistics.mean((svcp[:ymin], svcp[:ymax])))
 
                 svcm = stranded_vertex_coordinates[minus]
                 svcm[:height] = textsize + minus_coverage
@@ -467,7 +481,7 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=randstring(Merse
                 svcm[:xin] = svcm[:xmax]
                 svcm[:xout] = svcm[:xmin]
                 svcm[:coverage_to_y_map] = [svcm[:ymin] + radius + i for i in 1:minus_coverage]
-                svcm[:center] = Point(mean((svcm[:xmin], svcm[:xmax])), mean((svcm[:ymin], svcm[:ymax])))
+                svcm[:center] = Luxor.Point(Statistics.mean((svcm[:xmin], svcm[:xmax])), Statistics.mean((svcm[:ymin], svcm[:ymax])))
 
                 @assert svcp[:width] == svcm[:width]
                 @assert svcp[:xmin] == svcm[:xmin]
@@ -478,7 +492,7 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=randstring(Merse
                     current_contig_y_max = svcm[:ymax] + minus_coverage + radius
                 end
                 current_vertex_y_min = svcm[:ymax] + minus_coverage
-                for neighbor in outneighbors(canonical_bfs_tree, vertex)
+                for neighbor in LightGraphs.outneighbors(canonical_bfs_tree, vertex)
                     push!(vertices_in_next_depth_of_field, neighbor)
                 end
             end
@@ -493,11 +507,11 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=randstring(Merse
         end
     end
 
-    Drawing(current_global_x_max, current_global_y_max, filename)
-    background("white")
-    setline(1)
+    Luxor.Drawing(current_global_x_max, current_global_y_max, filename)
+    Luxor.background("white")
+    Luxor.setline(1)
     ncolors = length(stranded_kmer_graph.gprops[:observation_ids])
-    color_list = distinguishable_colors(ncolors+1, RGB(1,1,1))[2:end]
+    color_list = Colors.distinguishable_colors(ncolors+1, Colors.RGB(1,1,1))[2:end]
     for sequence_record_index in 1:length(stranded_kmer_graph.gprops[:observed_paths])
         sequence_path = stranded_kmer_graph.gprops[:observed_paths][sequence_record_index]
         sequence_color = color_list[stranded_kmer_graph.gprops[:observation_color_map][sequence_record_index]]
@@ -513,7 +527,7 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=randstring(Merse
         else
             source_strand = :minus
         end
-        setcolor(sequence_color)
+        Luxor.setcolor(sequence_color)
         for i in 2:length(sequence_path)
             vi = sequence_path[i]
             stranded_kmer_graph.vprops[vi][:coverage]
@@ -547,215 +561,215 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=randstring(Merse
                 # @show "implement me 2", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + (length(stranded_vertex_coordinates[ui][:coverage_to_y_map]) - uii)
                 v_radius = radius + vii - 1
-                a = Point(ux, uy)
-                b = Point(ux + u_radius, uy)
-                c = Point(vx + v_radius, vy)
-                d = Point(vx, vy)
-                move(a); curve(b, c, d); strokepath()
+                a = Luxor.Point(ux, uy)
+                b = Luxor.Point(ux + u_radius, uy)
+                c = Luxor.Point(vx + v_radius, vy)
+                d = Luxor.Point(vx, vy)
+                Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
             elseif x_direction == :even && source_strand == :plus && destination_strand == :minus && y_direction == :up
                 # @show "implement me 3",ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + uii - 1
                 v_radius = radius + (length(stranded_vertex_coordinates[vi][:coverage_to_y_map]) - vii)
-                a = Point(ux, uy)
-                b = Point(ux + u_radius, uy)
-                c = Point(vx + v_radius, vy)
-                d = Point(vx, vy)
-                move(a); curve(b, c, d); strokepath()
+                a = Luxor.Point(ux, uy)
+                b = Luxor.Point(ux + u_radius, uy)
+                c = Luxor.Point(vx + v_radius, vy)
+                d = Luxor.Point(vx, vy)
+                Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
             elseif x_direction == :even && source_strand == :minus && destination_strand == :plus && y_direction in (:even, :up)
                 # @show "implement me 4", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + uii - 1
                 v_radius = radius + (length(stranded_vertex_coordinates[vi][:coverage_to_y_map]) - vii)
-                a = Point(ux, uy)
-                b = Point(ux - u_radius, uy)
-                c = Point(vx - v_radius, vy)
-                d = Point(vx, vy)
-                move(a); curve(b, c, d); strokepath()
+                a = Luxor.Point(ux, uy)
+                b = Luxor.Point(ux - u_radius, uy)
+                c = Luxor.Point(vx - v_radius, vy)
+                d = Luxor.Point(vx, vy)
+                Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
             elseif x_direction == :even && source_strand == :minus && destination_strand == :plus && y_direction == :down
                 # @show "implement me 5", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + (length(stranded_vertex_coordinates[ui][:coverage_to_y_map]) - uii)
                 v_radius = radius + vii - 1
-                a = Point(ux, uy)
-                b = Point(ux - u_radius, uy)
-                c = Point(vx - v_radius, vy)
-                d = Point(vx, vy)
-                move(a); curve(b, c, d); strokepath()
+                a = Luxor.Point(ux, uy)
+                b = Luxor.Point(ux - u_radius, uy)
+                c = Luxor.Point(vx - v_radius, vy)
+                d = Luxor.Point(vx, vy)
+                Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
             # elseif x_direction == :even && source_strand == :minus && destination_strand == :minus
             #     @show "implement me 6", ui, uii, vi, vii, ux, uy, vx, vy
             elseif x_direction == :forward && source_strand == :plus && destination_strand == :plus
                 # @show "implement me 7", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + uii - 1
                 v_radius = radius + vii - 1
-                a = Point(ux, uy)
-                b = Point(mean((ux, vx)), uy)
-                c = Point(mean((ux, vx)), vy)
-                d = Point(vx, vy)
-                move(a); curve(b, c, d); strokepath()
+                a = Luxor.Point(ux, uy)
+                b = Luxor.Point(Statistics.mean((ux, vx)), uy)
+                c = Luxor.Point(Statistics.mean((ux, vx)), vy)
+                d = Luxor.Point(vx, vy)
+                Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
             elseif x_direction == :forward && source_strand == :plus && destination_strand == :minus
                 # @show "implement me 8", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + uii - 1
                 v_radius = radius + (length(stranded_vertex_coordinates[vi][:coverage_to_y_map]) - vii)
-                va = Point(vx, vy)
-                vb = Point(vx + v_radius, vy)
-                vc = Point(vx + v_radius, vy + 2v_radius)
-                vd = Point(vx, vy + 2v_radius)
-                move(va); curve(vb, vc, vd); strokepath()
+                va = Luxor.Point(vx, vy)
+                vb = Luxor.Point(vx + v_radius, vy)
+                vc = Luxor.Point(vx + v_radius, vy + 2v_radius)
+                vd = Luxor.Point(vx, vy + 2v_radius)
+                Luxor.move(va); Luxor.curve(vb, vc, vd); Luxor.strokepath()
                 v_extension = Point(stranded_vertex_coordinates[vi][:xout], vd.y)
-                move(vd); curve(vd, v_extension, v_extension); strokepath()
+                move(vd); curve(vd, v_extension, v_extension); Luxor.strokepath()
                 a = v_extension
-                d = Point(ux, uy)
-                b = Point(mean((a.x, d.x)), a.y)
-                c = Point(mean((a.x, d.x)), d.y)
-                move(a); curve(b, c, d); strokepath()
+                d = Luxor.Point(ux, uy)
+                b = Luxor.Point(Statistics.mean((a.x, d.x)), a.y)
+                c = Luxor.Point(Statistics.mean((a.x, d.x)), d.y)
+                Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
             elseif x_direction == :forward && source_strand == :minus && destination_strand == :plus
                 # @show "implement me 10", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + (length(stranded_vertex_coordinates[ui][:coverage_to_y_map]) - uii)
                 v_radius = radius
                 # downward, c - loop from the source strand
-                ua = Point(ux, uy)
-                ub = ua + Point(-u_radius, 0)
-                uc = ua + Point(-u_radius, 2u_radius)
-                ud = ua + Point(0, 2u_radius)
-                move(ua); curve(ub, uc, ud); strokepath()
-                va = Point(vx, vy)
-                vb = Point((stranded_vertex_coordinates[ui][:xmax] + vx)/2, vy)
-                vc = Point((stranded_vertex_coordinates[ui][:xmax] + vx)/2, ud.y)
-                vd = Point(stranded_vertex_coordinates[ui][:xmax], ud.y)
-                move(va); curve(vb, vc, vd); strokepath()
-                move(ud); curve(ud, vd, vd); strokepath()
+                ua = Luxor.Point(ux, uy)
+                ub = ua + Luxor.Point(-u_radius, 0)
+                uc = ua + Luxor.Point(-u_radius, 2u_radius)
+                ud = ua + Luxor.Point(0, 2u_radius)
+                Luxor.move(ua); Luxor.curve(ub, uc, ud); Luxor.strokepath()
+                va = Luxor.Point(vx, vy)
+                vb = Luxor.Point((stranded_vertex_coordinates[ui][:xmax] + vx)/2, vy)
+                vc = Luxor.Point((stranded_vertex_coordinates[ui][:xmax] + vx)/2, ud.y)
+                vd = Luxor.Point(stranded_vertex_coordinates[ui][:xmax], ud.y)
+                Luxor.move(va); Luxor.curve(vb, vc, vd); Luxor.strokepath()
+                Luxor.move(ud); Luxor.curve(ud, vd, vd); Luxor.strokepath()
             elseif x_direction == :forward && source_strand == :minus && destination_strand == :minus
                 ## @show "implement me 10", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + (length(stranded_vertex_coordinates[ui][:coverage_to_y_map]) - uii)
                 v_radius = radius + (length(stranded_vertex_coordinates[vi][:coverage_to_y_map]) - vii)
                 if stranded_vertex_coordinates[ui][:xin] == stranded_vertex_coordinates[vi][:xin] && ui != vi
-                    va = Point(vx, vy)
-                    vb = va + Point(v_radius, 0)
-                    vc = va + Point(v_radius, 2v_radius)
-                    vd = va + Point(0, 2v_radius)
-                    move(va); curve(vb, vc, vd); strokepath()
-                    v_extension = Point(stranded_vertex_coordinates[vi][:xout], vd.y)
-                    move(vd); curve(vd, v_extension, v_extension); strokepath()
-                    a = Point(ux, uy)
-                    b = Point(ux - u_radius, uy)
-                    c = Point(v_extension.x - v_radius, v_extension.y)
+                    va = Luxor.Point(vx, vy)
+                    vb = va + Luxor.Point(v_radius, 0)
+                    vc = va + Luxor.Point(v_radius, 2v_radius)
+                    vd = va + Luxor.Point(0, 2v_radius)
+                    Luxor.move(va); Luxor.curve(vb, vc, vd); Luxor.strokepath()
+                    v_extension = Luxor.Point(stranded_vertex_coordinates[vi][:xout], vd.y)
+                    Luxor.move(vd); Luxor.curve(vd, v_extension, v_extension); Luxor.strokepath()
+                    a = Luxor.Point(ux, uy)
+                    b = Luxor.Point(ux - u_radius, uy)
+                    c = Luxor.Point(v_extension.x - v_radius, v_extension.y)
                     d = v_extension
-                    move(a); curve(b, c, d); strokepath()
+                    Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
                 else
-                    ua = Point(ux, uy)
-                    ub = ua + Point(-u_radius, 0)
-                    uc = ua + Point(-u_radius, 2u_radius)
-                    ud = ua + Point(0, 2u_radius)
-                    move(ua); curve(ub, uc, ud); strokepath()
-                    va = Point(vx, vy)
-                    vb = va + Point(v_radius, 0)
-                    vc = va + Point(v_radius, 2v_radius)
-                    vd = va + Point(0, 2v_radius)
-                    move(va); curve(vb, vc, vd); strokepath()
+                    ua = Luxor.Point(ux, uy)
+                    ub = ua + Luxor.Point(-u_radius, 0)
+                    uc = ua + Luxor.Point(-u_radius, 2u_radius)
+                    ud = ua + Luxor.Point(0, 2u_radius)
+                    Luxor.move(ua); Luxor.curve(ub, uc, ud); Luxor.strokepath()
+                    va = Luxor.Point(vx, vy)
+                    vb = va + Luxor.Point(v_radius, 0)
+                    vc = va + Luxor.Point(v_radius, 2v_radius)
+                    vd = va + Luxor.Point(0, 2v_radius)
+                    Luxor.move(va); Luxor.curve(vb, vc, vd); Luxor.strokepath()
                     if ui == vi
                         a = ud
-                        b = Point(mean((ud.x, vd.x)), ud.y)
-                        c = Point(mean((ud.x, vd.x)), vd.y)
+                        b = Luxor.Point(Statistics.mean((ud.x, vd.x)), ud.y)
+                        c = Luxor.Point(Statistics.mean((ud.x, vd.x)), vd.y)
                         d = vd
-                        move(a); curve(b, c, d); strokepath()
+                        Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
                     else
-                        u_extension = Point(stranded_vertex_coordinates[ui][:xin], ud.y)
-                        move(ud); curve(ud, u_extension, u_extension); strokepath()
-                        v_extension = Point(stranded_vertex_coordinates[vi][:xout], vd.y)
-                        move(vd); curve(vd, v_extension, v_extension); strokepath()
+                        u_extension = Luxor.Point(stranded_vertex_coordinates[ui][:xin], ud.y)
+                        Luxor.move(ud); Luxor.curve(ud, u_extension, u_extension); Luxor.strokepath()
+                        v_extension = Luxor.Point(stranded_vertex_coordinates[vi][:xout], vd.y)
+                        Luxor.move(vd); Luxor.curve(vd, v_extension, v_extension); Luxor.strokepath()
                         a = u_extension
                         d = v_extension
-                        b = Point(mean((a.x, d.x)), a.y)
-                        c = Point(mean((a.x, d.x)), d.y)
-                        move(a); curve(b, c, d); strokepath()
+                        b = Luxor.Point(Statistics.mean((a.x, d.x)), a.y)
+                        c = Luxor.Point(Statistics.mean((a.x, d.x)), d.y)
+                        Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
                     end
                 end
             elseif x_direction == :backward && source_strand == :plus && destination_strand == :plus
                 ## @show "implement me 11", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + uii - 1
                 v_radius = radius + vii - 1
-                ua = Point(ux, uy)
-                ub = ua + Point(u_radius, 0)
-                uc = ua + Point(u_radius, -2u_radius)
-                ud = ua + Point(0, -2u_radius)
-                move(ua); curve(ub, uc, ud); strokepath()
+                ua = Luxor.Point(ux, uy)
+                ub = ua + Luxor.Point(u_radius, 0)
+                uc = ua + Luxor.Point(u_radius, -2u_radius)
+                ud = ua + Luxor.Point(0, -2u_radius)
+                Luxor.move(ua); Luxor.curve(ub, uc, ud); Luxor.strokepath()
                 if stranded_vertex_coordinates[ui][:xin] == stranded_vertex_coordinates[vi][:xin] && ui != vi
-                    u_extension = Point(stranded_vertex_coordinates[ui][:xin], ud.y)
-                    move(ud); curve(ud, u_extension, u_extension); strokepath()
+                    u_extension = Luxor.Point(stranded_vertex_coordinates[ui][:xin], ud.y)
+                    Luxor.move(ud); Luxor.curve(ud, u_extension, u_extension); Luxor.strokepath()
                     a = u_extension
-                    b = Point(u_extension.x - u_radius, u_extension.y)
-                    c = Point(vx - v_radius, vy)
-                    d = Point(vx, vy)
-                    move(a); curve(b, c, d); strokepath()
+                    b = Luxor.Point(u_extension.x - u_radius, u_extension.y)
+                    c = Luxor.Point(vx - v_radius, vy)
+                    d = Luxor.Point(vx, vy)
+                    Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
                 else
-                    va = Point(vx, vy)
-                    vb = va + Point(-v_radius, 0)
-                    vc = va + Point(-v_radius, -2v_radius)
-                    vd = va + Point(0, -2v_radius)
-                    move(va); curve(vb, vc, vd); strokepath()
+                    va = Luxor.Point(vx, vy)
+                    vb = va + Luxor.Point(-v_radius, 0)
+                    vc = va + Luxor.Point(-v_radius, -2v_radius)
+                    vd = va + Luxor.Point(0, -2v_radius)
+                    Luxor.move(va); Luxor.curve(vb, vc, vd); Luxor.strokepath()
                     if ui == vi
                         a = ud
-                        b = Point(mean((ud.x, vd.x)), ud.y)
-                        c = Point(mean((ud.x, vd.x)), vd.y)
+                        b = Luxor.Point(Statistics.mean((ud.x, vd.x)), ud.y)
+                        c = Luxor.Point(Statistics.mean((ud.x, vd.x)), vd.y)
                         d = vd
-                        move(a); curve(b, c, d); strokepath()
+                        Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
                     else
-                        u_extension = Point(stranded_vertex_coordinates[ui][:xin], ud.y)
-                        move(ud); curve(ud, u_extension, u_extension); strokepath()
-                        v_extension = Point(stranded_vertex_coordinates[vi][:xout], vd.y)
-                        move(vd); curve(vd, v_extension, v_extension); strokepath()
+                        u_extension = Luxor.Point(stranded_vertex_coordinates[ui][:xin], ud.y)
+                        Luxor.move(ud); Luxor.curve(ud, u_extension, u_extension); Luxor.strokepath()
+                        v_extension = Luxor.Point(stranded_vertex_coordinates[vi][:xout], vd.y)
+                        Luxor.move(vd); Luxor.curve(vd, v_extension, v_extension); Luxor.strokepath()
                         a = u_extension
                         d = v_extension
-                        b = Point(mean((a.x, d.x)), a.y)
-                        c = Point(mean((a.x, d.x)), d.y)
-                        move(a); curve(b, c, d); strokepath()
+                        b = Luxor.Point(Statistics.mean((a.x, d.x)), a.y)
+                        c = Luxor.Point(Statistics.mean((a.x, d.x)), d.y)
+                        Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
                     end
                 end
             elseif x_direction == :backward && source_strand == :plus && destination_strand == :minus
                 # @show "implement me 12", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + uii - 1
                 v_radius = radius + vii - 1
-                ua = Point(ux, uy)
-                ub = Point(ux + u_radius, uy)
-                uc = Point(ux + u_radius, uy - 2u_radius)
-                ud = Point(ux, uy - 2u_radius)
-                move(ua); curve(ub, uc, ud); strokepath()
+                ua = Luxor.Point(ux, uy)
+                ub = Luxor.Point(ux + u_radius, uy)
+                uc = Luxor.Point(ux + u_radius, uy - 2u_radius)
+                ud = Luxor.Point(ux, uy - 2u_radius)
+                Luxor.move(ua); Luxor.curve(ub, uc, ud); Luxor.strokepath()
                 a = ud
-                d = Point(stranded_vertex_coordinates[ui][:xin], ud.y)
+                d = Luxor.Point(stranded_vertex_coordinates[ui][:xin], ud.y)
                 b = a
                 c = d
-                move(a); curve(b, c, d); strokepath()
-                va = Point(vx, vy)
-                vb = Point(mean((vx, d.x)), vy)
-                vc = Point(mean((vx, d.x)), d.y)
+                Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
+                va = Luxor.Point(vx, vy)
+                vb = Luxor.Point(Statistics.mean((vx, d.x)), vy)
+                vc = Luxor.Point(Statistics.mean((vx, d.x)), d.y)
                 vd = d
-                move(va); curve(vb, vc, vd); strokepath()
+                Luxor.move(va); Luxor.curve(vb, vc, vd); Luxor.strokepath()
             elseif x_direction == :backward && source_strand == :minus && destination_strand == :plus
                 # @show "implement me 13", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + uii - 1
                 v_radius = radius + vii - 1
-                va = Point(vx, vy)
-                vb = Point(vx - v_radius, vy)
-                vc = Point(vx - v_radius, vy - 2v_radius)
-                vd = Point(vx, vy - 2v_radius)
-                move(va); curve(vb, vc, vd); strokepath()
+                va = Luxor.Point(vx, vy)
+                vb = Luxor.Point(vx - v_radius, vy)
+                vc = Luxor.Point(vx - v_radius, vy - 2v_radius)
+                vd = Luxor.Point(vx, vy - 2v_radius)
+                Luxor.move(va); Luxor.curve(vb, vc, vd); Luxor.strokepath()
                 a = vd
-                d = Point(stranded_vertex_coordinates[vi][:xout], vy - 2v_radius)
+                d = Luxor.Point(stranded_vertex_coordinates[vi][:xout], vy - 2v_radius)
                 b = a
                 c = d
-                move(a); curve(b, c, d); strokepath()
-                ua = Point(ux, uy)
-                ub = Point(mean((ux, d.x)), uy)
+                Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
+                ua = Luxor.Point(ux, uy)
+                ub = Luxor.Point(Statistics.mean((ux, d.x)), uy)
                 ud = d
-                uc = Point(mean((ux, d.x)), d.y)
-                move(ua); curve(ub, uc, ud); strokepath()
+                uc = Luxor.Point(Statistics.mean((ux, d.x)), d.y)
+                Luxor.move(ua); Luxor.curve(ub, uc, ud); Luxor.strokepath()
             elseif x_direction == :backward && source_strand == :minus && destination_strand == :minus
                 ## @show "implement me 14", ui, uii, vi, vii, ux, uy, vx, vy, a, b, c, d
                 u_radius = radius + uii - 1
                 v_radius = radius + vii - 1
-                a = Point(ux, uy)
-                b = Point(mean((ux, vx)), uy)
-                c = Point(mean((ux, vx)), vy)
-                d = Point(vx, vy)
-                move(a); curve(b, c, d); strokepath()
+                a = Luxor.Point(ux, uy)
+                b = Luxor.Point(Statistics.mean((ux, vx)), uy)
+                c = Luxor.Point(Statistics.mean((ux, vx)), vy)
+                d = Luxor.Point(vx, vy)
+                Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
             else
                 error("how'd we get here?")
             end
@@ -779,65 +793,65 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=randstring(Merse
         @assert stranded_vertex_coordinates[plus][:xmax] == stranded_vertex_coordinates[minus][:xmax]
         stranded_vertex_coordinates[plus][:xmin]
         stranded_vertex_coordinates[plus][:xmax]
-        center = Point(mean((stranded_vertex_coordinates[plus][:xmin], stranded_vertex_coordinates[plus][:xmax])),
-                       mean((stranded_vertex_coordinates[plus][:ymin], stranded_vertex_coordinates[minus][:ymax])))
+        center = Luxor.Point(Statistics.mean((stranded_vertex_coordinates[plus][:xmin], stranded_vertex_coordinates[plus][:xmax])),
+                             Statistics.mean((stranded_vertex_coordinates[plus][:ymin], stranded_vertex_coordinates[minus][:ymax])))
         height = stranded_vertex_coordinates[minus][:ymax] - stranded_vertex_coordinates[plus][:ymin]
         width = stranded_vertex_coordinates[minus][:xmax] - stranded_vertex_coordinates[plus][:xmin]
-        setcolor("gray")
-        box(center, width, height, :fill)
+        Luxor.setcolor("gray")
+        Luxor.box(center, width, height, :fill)
         for (i, y) in enumerate(stranded_vertex_coordinates[plus][:coverage_to_y_map])
             record_index, (sequence_index, orientation) = stranded_kmer_graph.vprops[plus][:coverage][i]
             color_index = stranded_kmer_graph.gprops[:observation_color_map][record_index]
-            setcolor(color_list[color_index])
-            line(Point(stranded_vertex_coordinates[plus][:xmin], y), Point(stranded_vertex_coordinates[plus][:xmax], y), :stroke)
-            setcolor("white")
-            fontsize(1)
-            fontface("Menlo Bold")
-            Luxor.text(string(sequence_index), Point(stranded_vertex_coordinates[plus][:xin] + 1, y), valign=:middle, halign=:center)
+            Luxor.setcolor(color_list[color_index])
+            Luxor.line(Luxor.Point(stranded_vertex_coordinates[plus][:xmin], y), Luxor.Point(stranded_vertex_coordinates[plus][:xmax], y), :stroke)
+            Luxor.setcolor("white")
+            Luxor.fontsize(1)
+            Luxor.fontface("Menlo Bold")
+            Luxor.text(string(sequence_index), Luxor.Point(stranded_vertex_coordinates[plus][:xin] + 1, y), valign=:middle, halign=:center)
             if sequence_index == 1
-                circle(Point(stranded_vertex_coordinates[plus][:xin] + 2, y), 0.5, :fill)
+                Luxor.circle(Luxor.Point(stranded_vertex_coordinates[plus][:xin] + 2, y), 0.5, :fill)
             end
         end
         for (i, y) in enumerate(stranded_vertex_coordinates[minus][:coverage_to_y_map])
             record_index, (sequence_index, orientation) = stranded_kmer_graph.vprops[minus][:coverage][i]
             color_index = stranded_kmer_graph.gprops[:observation_color_map][record_index]
-            setcolor(color_list[color_index])
-            line(Point(stranded_vertex_coordinates[minus][:xmin], y), Point(stranded_vertex_coordinates[minus][:xmax], y), :stroke)
-            setcolor("white")
-            fontsize(1)
-            fontface("Menlo Bold")
-            Luxor.text(string(sequence_index), Point(stranded_vertex_coordinates[minus][:xin] - 1, y), valign=:middle, halign=:center)
+            Luxor.setcolor(color_list[color_index])
+            Luxor.line(Luxor.Point(stranded_vertex_coordinates[minus][:xmin], y), Luxor.Point(stranded_vertex_coordinates[minus][:xmax], y), :stroke)
+            Luxor.setcolor("white")
+            Luxor.fontsize(1)
+            Luxor.fontface("Menlo Bold")
+            Luxor.text(string(sequence_index), Luxor.Point(stranded_vertex_coordinates[minus][:xin] - 1, y), valign=:middle, halign=:center)
             if sequence_index == 1
-                circle(Point(stranded_vertex_coordinates[minus][:xin] - 2, y), 0.5, :fill)
+                Luxor.circle(Luxor.Point(stranded_vertex_coordinates[minus][:xin] - 2, y), 0.5, :fill)
             end
         end
         plus_sequence = stranded_kmer_graph.gprops[:stranded_kmers][plus]
-        setcolor("white")
-        fontsize(textsize)
-        fontface("Menlo")
+        Luxor.setcolor("white")
+        Luxor.fontsize(textsize)
+        Luxor.fontface("Menlo")
         Luxor.text(string(plus_sequence), stranded_vertex_coordinates[plus][:center], valign=:middle, halign=:center)
         minus_sequence = stranded_kmer_graph.gprops[:stranded_kmers][minus]
         Luxor.text(string(minus_sequence), stranded_vertex_coordinates[minus][:center], valign=:middle, halign=:center)
-        setcolor("black")
+        Luxor.setcolor("black")
 
-        a = Point(stranded_vertex_coordinates[plus][:xin], stranded_vertex_coordinates[plus][:ymin])
-        b = Point(stranded_vertex_coordinates[plus][:xin], stranded_vertex_coordinates[plus][:ymin] + radius + 0.5)
-        c = Point(stranded_vertex_coordinates[plus][:xin] + radius, stranded_vertex_coordinates[plus][:ymin] + radius + 0.5)
-        poly([a, b, c], :fill)
-        a = Point(stranded_vertex_coordinates[plus][:xin], stranded_vertex_coordinates[plus][:ymax])
-        b = Point(stranded_vertex_coordinates[plus][:xin], stranded_vertex_coordinates[plus][:ymax] - radius + 0.5)
-        c = Point(stranded_vertex_coordinates[plus][:xin] + radius, stranded_vertex_coordinates[plus][:ymax] - radius + 0.5)
-        poly([a, b, c], :fill)
-        a = Point(stranded_vertex_coordinates[minus][:xin], stranded_vertex_coordinates[minus][:ymin])
-        b = Point(stranded_vertex_coordinates[minus][:xin], stranded_vertex_coordinates[minus][:ymin] + radius + 0.5)
-        c = Point(stranded_vertex_coordinates[minus][:xin] - radius, stranded_vertex_coordinates[minus][:ymin] + radius + 0.5)
-        poly([a, b, c], :fill)
-        a = Point(stranded_vertex_coordinates[minus][:xin], stranded_vertex_coordinates[minus][:ymax])
-        b = Point(stranded_vertex_coordinates[minus][:xin], stranded_vertex_coordinates[minus][:ymax] - radius + 0.5)
-        c = Point(stranded_vertex_coordinates[minus][:xin] - radius, stranded_vertex_coordinates[minus][:ymax] - radius + 0.5)
-        poly([a, b, c], :fill)
+        a = Luxor.Point(stranded_vertex_coordinates[plus][:xin], stranded_vertex_coordinates[plus][:ymin])
+        b = Luxor.Point(stranded_vertex_coordinates[plus][:xin], stranded_vertex_coordinates[plus][:ymin] + radius + 0.5)
+        c = Luxor.Point(stranded_vertex_coordinates[plus][:xin] + radius, stranded_vertex_coordinates[plus][:ymin] + radius + 0.5)
+        Luxor.poly([a, b, c], :fill)
+        a = Luxor.Point(stranded_vertex_coordinates[plus][:xin], stranded_vertex_coordinates[plus][:ymax])
+        b = Luxor.Point(stranded_vertex_coordinates[plus][:xin], stranded_vertex_coordinates[plus][:ymax] - radius + 0.5)
+        c = Luxor.Point(stranded_vertex_coordinates[plus][:xin] + radius, stranded_vertex_coordinates[plus][:ymax] - radius + 0.5)
+        Luxor.poly([a, b, c], :fill)
+        a = Luxor.Point(stranded_vertex_coordinates[minus][:xin], stranded_vertex_coordinates[minus][:ymin])
+        b = Luxor.Point(stranded_vertex_coordinates[minus][:xin], stranded_vertex_coordinates[minus][:ymin] + radius + 0.5)
+        c = Luxor.Point(stranded_vertex_coordinates[minus][:xin] - radius, stranded_vertex_coordinates[minus][:ymin] + radius + 0.5)
+        Luxor.poly([a, b, c], :fill)
+        a = Luxor.Point(stranded_vertex_coordinates[minus][:xin], stranded_vertex_coordinates[minus][:ymax])
+        b = Luxor.Point(stranded_vertex_coordinates[minus][:xin], stranded_vertex_coordinates[minus][:ymax] - radius + 0.5)
+        c = Luxor.Point(stranded_vertex_coordinates[minus][:xin] - radius, stranded_vertex_coordinates[minus][:ymax] - radius + 0.5)
+        Luxor.poly([a, b, c], :fill)
     end
-    finish()
+    Luxor.finish()
 end
 
 """
@@ -845,7 +859,7 @@ document me
 """
 function UPGMA(distance_matrix)
     N = size(distance_matrix, 1)
-    tree = MetaDiGraph(N)
+    tree = MetaGraphs.MetaDiGraph(N)
     labels = collect(1:N)
     c_vertex = N
     while N > 1
@@ -861,22 +875,22 @@ function UPGMA(distance_matrix)
         b_weight = length(b_paths) > 1 ? length(b_paths) : 1
         if a_weight > 1
             for (u,v) in zip(first(a_paths)[1:end-1], first(a_paths)[2:end])
-                c2a_distance -= get_prop(tree, Edge(u, v), :length)
+                c2a_distance -= LightGraphs.get_prop(tree, LightGraphs.Edge(u, v), :length)
             end
         end
         if b_weight > 1
             for (u,v) in zip(first(b_paths)[1:end-1], first(b_paths)[2:end])
-                c2b_distance -= get_prop(tree, Edge(u, v), :length)
+                c2b_distance -= LightGraphs.get_prop(tree, LightGraphs.Edge(u, v), :length)
             end
         end
         c2a_distance
         c2b_distance
-        add_edge!(tree, c_vertex, a_vertex)
-        set_prop!(tree, Edge(c_vertex, a_vertex), :length, c2a_distance)
-        set_prop!(tree, Edge(c_vertex, a_vertex), :weight, 1)
-        add_edge!(tree, c_vertex, b_vertex)
-        set_prop!(tree, Edge(c_vertex, b_vertex), :length, c2b_distance)
-        set_prop!(tree, Edge(c_vertex, b_vertex), :weight, 1)
+        LightGraphs.add_edge!(tree, c_vertex, a_vertex)
+        LightGraphs.set_prop!(tree, LightGraphs.Edge(c_vertex, a_vertex), :length, c2a_distance)
+        LightGraphs.set_prop!(tree, LightGraphs.Edge(c_vertex, a_vertex), :weight, 1)
+        LightGraphs.add_edge!(tree, c_vertex, b_vertex)
+        LightGraphs.set_prop!(tree, LightGraphs.Edge(c_vertex, b_vertex), :length, c2b_distance)
+        LightGraphs.set_prop!(tree, LightGraphs.Edge(c_vertex, b_vertex), :weight, 1)
         labels = deleteat!(labels, b_index)
         c_index = a_index
         labels[c_index] = c_vertex
@@ -994,20 +1008,20 @@ end
 #     graph["edges"] = graph["edges"][ordering]
 #     graph["edge_coverage"] = graph["edge_coverage"][ordering]
 #     return graph
-# end
+# ene
 
 """
     build_stranded_kmer_graph(canonical_kmers, observations)
 
 Create a weighted, strand-specific kmer (de bruijn) graph from a set of kmers
-and a series of sequence observations in FASTA format
+and a series of sequence observations in FASTA format.
 """
 function build_stranded_kmer_graph(canonical_kmers, observations)
-    stranded_kmers = sort!(vcat(canonical_kmers, [reverse_complement(kmer) for kmer in canonical_kmers]))
+    stranded_kmers = sort!(vcat(canonical_kmers, [BioSequences.reverse_complement(kmer) for kmer in canonical_kmers]))
     stranded_kmer_to_reverse_complement_map = [
-        findfirst(stranded_kmer -> reverse_complement(stranded_kmer) == kmer, stranded_kmers) for kmer in stranded_kmers
+        findfirst(stranded_kmer -> BioSequences.reverse_complement(stranded_kmer) == kmer, stranded_kmers) for kmer in stranded_kmers
     ]
-    stranded_kmer_graph = MetaDiGraph(length(stranded_kmers))
+    stranded_kmer_graph = MetaGraphs.MetaDiGraph(length(stranded_kmers))
     stranded_kmer_graph.gprops[:stranded_kmers] = stranded_kmers
     stranded_kmer_graph.gprops[:reverse_complement_map] = stranded_kmer_to_reverse_complement_map
     stranded_kmer_graph.gprops[:k] = length(first(stranded_kmers))
@@ -1015,12 +1029,12 @@ function build_stranded_kmer_graph(canonical_kmers, observations)
     stranded_kmer_graph.gprops[:observation_color_map] = Vector{Int}()
     stranded_kmer_graph.gprops[:observation_ids] = Vector{String}()
     stranded_kmer_graph.gprops[:observed_paths] = Vector{Vector{Int}}()
-    for vertex in 1:nv(stranded_kmer_graph)
+    for vertex in 1:LightGraphs.nv(stranded_kmer_graph)
         stranded_kmer_graph.vprops[vertex] = Dict(:coverage => Vector{Pair{Int, Pair{Int, Bool}}}())
     end
     for observation in observations
-        observation_id = FASTA.identifier(observation)
-        observed_sequence = FASTA.sequence(observation)
+        observation_id = BioSequences.FASTA.identifier(observation)
+        observed_sequence = BioSequences.FASTA.sequence(observation)
         if length(observed_sequence) < stranded_kmer_graph.gprops[:k]
             @warn "skipping sequence shorter than k with id $observation_id & length $(length(observed_sequence))"
         else
@@ -1035,15 +1049,15 @@ function build_stranded_kmer_graph(canonical_kmers, observations)
                 vi_coverage = (observation_index => (i => true))
                 push!(stranded_kmer_graph.vprops[vi][:coverage], vi_coverage)
                 edge_coverage = ui_coverage => vi_coverage
-                if has_edge(stranded_kmer_graph, ui, vi)
-                    push!(stranded_kmer_graph.eprops[Edge(ui, vi)][:coverage], edge_coverage)
+                if LightGraphs.has_edge(stranded_kmer_graph, ui, vi)
+                    push!(stranded_kmer_graph.eprops[LightGraphs.Edge(ui, vi)][:coverage], edge_coverage)
                 else
-                    add_edge!(stranded_kmer_graph, ui, vi, Dict(:coverage => [edge_coverage]))
+                    LightGraphs.add_edge!(stranded_kmer_graph, ui, vi, Dict(:coverage => [edge_coverage]))
                 end
                 ui′ = stranded_kmer_graph.gprops[:reverse_complement_map][ui]
                 vi′ = stranded_kmer_graph.gprops[:reverse_complement_map][vi]
-                if !has_edge(stranded_kmer_graph, vi′, ui′)
-                    add_edge!(stranded_kmer_graph, vi′, ui′, Dict(:coverage => Vector{typeof(edge_coverage)}()))
+                if !LightGraphs.has_edge(stranded_kmer_graph, vi′, ui′)
+                    LightGraphs.add_edge!(stranded_kmer_graph, vi′, ui′, Dict(:coverage => Vector{typeof(edge_coverage)}()))
                 end
                 ui = vi
                 ui_coverage = vi_coverage
@@ -1061,7 +1075,7 @@ function determine_file_type(file)
         file = file[1:end-3]
     end
     if endswith(file, ".fa") || endswith(file, ".fasta") || endswith(file, ".fna")
-        return FASTA
+        return BioSequences.FASTA
     elseif endswith(file, ".fq") || endswith(file, ".fastq")
         return FASTQ
     end
@@ -1069,7 +1083,7 @@ end
 
 function open_file(file)
     if endswith(file, ".gz")
-        return GzipDecompressorStream(open(file))
+        return CodecZlib.GzipDecompressorStream(open(file))
     else
         return open(file)
     end
@@ -1143,7 +1157,7 @@ function plot_histogram(parsed_args)
                 legend=false);
     if length(X) > 1
         X2 = LinRange(minimum(X), maximum(X), 100)
-        Y2 = predict(lm(@formula(Y ~ X), DataFrame(X = X, Y = Y)), DataFrame(X = X2))
+        Y2 = predict(lm(GLM.@formula(Y ~ X), DataFrame(X = X, Y = Y)), DataFrame(X = X2))
         plot!(p, X2, Y2)
         annotate!(p, 0, 1, Plots.text("r = $(round(cor(X, Y), digits=2))", 10, :left))
     end
@@ -1160,7 +1174,7 @@ function plot_rank_frequency(parsed_args)
     X = log2.(rank)
     Y = log2.(kmer_counts)
     X2 = LinRange(minimum(X), maximum(X), 100)
-    Y2 = predict(lm(@formula(Y ~ X), DataFrame(X = X, Y = Y)), DataFrame(X = X2))
+    Y2 = predict(lm(GLM.@formula(Y ~ X), DataFrame(X = X, Y = Y)), DataFrame(X = X2))
 
     if endswith(parsed_args["kmer-counts"], ".gz")
         filename = join(split(parsed_args["kmer-counts"], '.')[1:end-1], '.')
