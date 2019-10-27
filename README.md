@@ -1,6 +1,6 @@
 # Eisenia
 
-A package for probablistic graph genome assembly, analysis, and identification using kmers
+A package for kmer-based probablistic graph genome assembly and analysis
 
 WIP
 
