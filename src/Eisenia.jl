@@ -47,10 +47,26 @@ document me
 """
 function sequence_to_stranded_path(stranded_kmers, sequence)
     k = length(first(stranded_kmers))
-    path = Vector{Int}()
-    for i in 1:length(sequence)-k+1
-        kmer = view(sequence, i:i+k-1)
-        push!(path, findfirst(stranded_kmer -> kmer == stranded_kmer, stranded_kmers))
+    path = Vector{Pair{Int, Bool}}()
+    for (i, kmer) in BioSequences.each(BioSequences.DNAKmer{k}, sequence)
+        kmer_index = findfirst(stranded_kmer -> kmer == stranded_kmer, stranded_kmers)
+        orientation = true
+        push!(path, kmer_index => orientation)
+    end
+    return path
+end
+
+"""
+document me
+"""
+function sequence_to_canonical_path(canonical_kmers, sequence)
+    k = length(first(canonical_kmers))
+    path = Vector{Pair{Int, Bool}}()
+    for (i, kmer) in BioSequences.each(BioSequences.DNAKmer{k}, sequence)
+        canonical_kmer = BioSequences.canonical(kmer)
+        kmer_index = findfirst(_canonical_kmer -> _canonical_kmer == canonical_kmer, canonical_kmers)
+        orientation = kmer == canonical_kmer
+        push!(path, kmer_index => orientation)
     end
     return path
 end
@@ -516,7 +532,7 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstrin
         sequence_path = stranded_kmer_graph.gprops[:observed_paths][sequence_record_index]
         sequence_color = color_list[stranded_kmer_graph.gprops[:observation_color_map][sequence_record_index]]
         i = 1
-        ui = sequence_path[i]
+        ui = first(sequence_path[i])
         uiis = findall(observation -> observation == (sequence_record_index => (i => true)), stranded_kmer_graph.vprops[ui][:coverage])
         @assert length(uiis) == 1
         uii = first(uiis)
@@ -529,7 +545,7 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstrin
         end
         Luxor.setcolor(sequence_color)
         for i in 2:length(sequence_path)
-            vi = sequence_path[i]
+            vi = first(sequence_path[i])
             stranded_kmer_graph.vprops[vi][:coverage]
             viis = findall(observation -> observation == (sequence_record_index => (i => true)), stranded_kmer_graph.vprops[vi][:coverage])
             @assert length(viis) == 1
@@ -555,10 +571,7 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstrin
             else
                 destination_strand = :minus
             end
-            # if x_direction == :even && source_strand == :plus && destination_strand == :plus
-            #     @show "implement me 1", ui, uii, vi, vii, ux, uy, vx, vy
             if x_direction == :even && source_strand == :plus && destination_strand == :minus && y_direction in (:even, :down)
-                # @show "implement me 2", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + (length(stranded_vertex_coordinates[ui][:coverage_to_y_map]) - uii)
                 v_radius = radius + vii - 1
                 a = Luxor.Point(ux, uy)
@@ -567,7 +580,6 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstrin
                 d = Luxor.Point(vx, vy)
                 Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
             elseif x_direction == :even && source_strand == :plus && destination_strand == :minus && y_direction == :up
-                # @show "implement me 3",ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + uii - 1
                 v_radius = radius + (length(stranded_vertex_coordinates[vi][:coverage_to_y_map]) - vii)
                 a = Luxor.Point(ux, uy)
@@ -576,7 +588,6 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstrin
                 d = Luxor.Point(vx, vy)
                 Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
             elseif x_direction == :even && source_strand == :minus && destination_strand == :plus && y_direction in (:even, :up)
-                # @show "implement me 4", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + uii - 1
                 v_radius = radius + (length(stranded_vertex_coordinates[vi][:coverage_to_y_map]) - vii)
                 a = Luxor.Point(ux, uy)
@@ -585,7 +596,6 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstrin
                 d = Luxor.Point(vx, vy)
                 Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
             elseif x_direction == :even && source_strand == :minus && destination_strand == :plus && y_direction == :down
-                # @show "implement me 5", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + (length(stranded_vertex_coordinates[ui][:coverage_to_y_map]) - uii)
                 v_radius = radius + vii - 1
                 a = Luxor.Point(ux, uy)
@@ -593,10 +603,7 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstrin
                 c = Luxor.Point(vx - v_radius, vy)
                 d = Luxor.Point(vx, vy)
                 Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
-            # elseif x_direction == :even && source_strand == :minus && destination_strand == :minus
-            #     @show "implement me 6", ui, uii, vi, vii, ux, uy, vx, vy
             elseif x_direction == :forward && source_strand == :plus && destination_strand == :plus
-                # @show "implement me 7", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + uii - 1
                 v_radius = radius + vii - 1
                 a = Luxor.Point(ux, uy)
@@ -605,7 +612,6 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstrin
                 d = Luxor.Point(vx, vy)
                 Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
             elseif x_direction == :forward && source_strand == :plus && destination_strand == :minus
-                # @show "implement me 8", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + uii - 1
                 v_radius = radius + (length(stranded_vertex_coordinates[vi][:coverage_to_y_map]) - vii)
                 va = Luxor.Point(vx, vy)
@@ -621,7 +627,6 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstrin
                 c = Luxor.Point(Statistics.mean((a.x, d.x)), d.y)
                 Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
             elseif x_direction == :forward && source_strand == :minus && destination_strand == :plus
-                # @show "implement me 10", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + (length(stranded_vertex_coordinates[ui][:coverage_to_y_map]) - uii)
                 v_radius = radius
                 # downward, c - loop from the source strand
@@ -637,7 +642,6 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstrin
                 Luxor.move(va); Luxor.curve(vb, vc, vd); Luxor.strokepath()
                 Luxor.move(ud); Luxor.curve(ud, vd, vd); Luxor.strokepath()
             elseif x_direction == :forward && source_strand == :minus && destination_strand == :minus
-                ## @show "implement me 10", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + (length(stranded_vertex_coordinates[ui][:coverage_to_y_map]) - uii)
                 v_radius = radius + (length(stranded_vertex_coordinates[vi][:coverage_to_y_map]) - vii)
                 if stranded_vertex_coordinates[ui][:xin] == stranded_vertex_coordinates[vi][:xin] && ui != vi
@@ -683,7 +687,6 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstrin
                     end
                 end
             elseif x_direction == :backward && source_strand == :plus && destination_strand == :plus
-                ## @show "implement me 11", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + uii - 1
                 v_radius = radius + vii - 1
                 ua = Luxor.Point(ux, uy)
@@ -724,7 +727,6 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstrin
                     end
                 end
             elseif x_direction == :backward && source_strand == :plus && destination_strand == :minus
-                # @show "implement me 12", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + uii - 1
                 v_radius = radius + vii - 1
                 ua = Luxor.Point(ux, uy)
@@ -743,7 +745,6 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstrin
                 vd = d
                 Luxor.move(va); Luxor.curve(vb, vc, vd); Luxor.strokepath()
             elseif x_direction == :backward && source_strand == :minus && destination_strand == :plus
-                # @show "implement me 13", ui, uii, vi, vii, ux, uy, vx, vy
                 u_radius = radius + uii - 1
                 v_radius = radius + vii - 1
                 va = Luxor.Point(vx, vy)
@@ -762,7 +763,6 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstrin
                 uc = Luxor.Point(Statistics.mean((ux, d.x)), d.y)
                 Luxor.move(ua); Luxor.curve(ub, uc, ud); Luxor.strokepath()
             elseif x_direction == :backward && source_strand == :minus && destination_strand == :minus
-                ## @show "implement me 14", ui, uii, vi, vii, ux, uy, vx, vy, a, b, c, d
                 u_radius = radius + uii - 1
                 v_radius = radius + vii - 1
                 a = Luxor.Point(ux, uy)
@@ -928,88 +928,6 @@ function UPGMA(distance_matrix)
     return tree
 end
 
-# add color by file, color by group options later
-# function build_stranded_kmer_graph(canonical_kmer_file,
-#                                    observations,
-#                                    filename = canonical_kmer_file *
-#                                               "." *
-#                                               replace(string(Dates.now()), ':' => '.') *
-#                                               ".graph")
-#     graph = jldopen(filename, "w")
-#     canonical_K = countlines(canonical_kmer_file)
-#     K = canonical_K * 2
-#     graph["stranded_kmers"] = Vector{DNASequence}(undef, K)
-#     for (i, kmer_string) in enumerate(eachline(canonical_kmer_file))
-#         kmer = DNASequence(kmer_string)
-#         kmer′ = reverse_complement(kmer)
-#         graph["stranded_kmers"][i] = kmer
-#         graph["stranded_kmers"][i + canonical_K] = kmer′
-#     end
-#     sort!(graph["stranded_kmers"])
-#     graph["stranded_kmer_to_reverse_complement_map"] = zeros(Int, K)
-#     for i in 1:K
-#         kmer = graph["stranded_kmers"][i]
-#         kmer′ = reverse_complement(kmer)
-#         kmer′_index = findfirst(this_kmer -> this_kmer == kmer′, graph["stranded_kmers"])
-#         graph["stranded_kmer_to_reverse_complement_map"][i] = kmer′_index
-#     end
-#
-#     graph["observation_color_map"] = Vector{Int}()
-#     graph["observation_ids"] = Vector{String}()
-#     graph["observed_paths"] = Vector{Vector{Int}}()
-#     graph["k"] = length(first(graph["stranded_kmers"]))
-#     graph["K"] = length(graph["stranded_kmers"])
-#     coverage_type = Pair{Int, Pair{Int, Bool}}
-#     graph["vertex_coverage"] = fill(Vector{coverage_type}(), K)
-#     graph["edges"] = Vector{Pair{Int, Int}}()
-#     graph["edge_coverage"] = Vector{Vector{Pair{coverage_type, coverage_type}}}()
-#     for file in observations
-#         filetype = determine_file_type(file)
-#         for record in filetype.Reader(open_file(file))
-#             observation_id = filetype.identifier(record)
-#             observed_sequence = filetype.sequence(record)
-#             if length(observed_sequence) < graph["k"]
-#                 @warn "skipping sequence shorter than k with id $observation_id & length $(length(observed_sequence))"
-#             else
-#                 observation_index = length(graph["observed_paths"]) + 1
-#                 observed_path = sequence_to_stranded_path(graph["stranded_kmers"], observed_sequence)
-#                 i = 1
-#                 ui = observed_path[i]
-#                 ui_coverage = (observation_index => (i => true))
-#                 push!(graph["vertex_coverage"][ui], ui_coverage)
-#                 for i in 2:length(observed_path)
-#                     vi = observed_path[i]
-#                     vi_coverage = (observation_index => (i => true))
-#                     push!(graph["vertex_coverage"][vi], vi_coverage)
-#                     edge = (ui => vi)
-#                     edge_coverage = ui_coverage => vi_coverage
-#                     edge_index = findfirst(e -> e == edge, graph["edges"])
-#                     if edge_index == nothing
-#                         push!(graph["edges"], edge)
-#                         push!(graph["edge_coverage"], [edge_coverage])
-#                     else
-#                         push!(graph["edge_coverage"][edge_index], edge_coverage)
-#                     end
-#                     # ui′ = stranded_kmer_graph.gprops[:reverse_complement_map][ui]
-#                     # vi′ = stranded_kmer_graph.gprops[:reverse_complement_map][vi]
-#                     # if !has_edge(stranded_kmer_graph, vi′, ui′)
-#                         # add_edge!(stranded_kmer_graph, vi′, ui′, Dict(:coverage => Vector{typeof(edge_coverage)}()))
-#                     # end
-#                     ui = vi
-#                     ui_coverage = vi_coverage
-#                 end
-#                 push!(graph["observed_paths"], observed_path)
-#                 push!(graph["observation_ids"], observation_id)
-#                 push!(graph["observation_color_map"], observation_index)
-#             end
-#         end
-#     end
-#     ordering = sortperm(graph["edges"])
-#     graph["edges"] = graph["edges"][ordering]
-#     graph["edge_coverage"] = graph["edge_coverage"][ordering]
-#     return graph
-# ene
-
 """
     build_stranded_kmer_graph(canonical_kmers, observations)
 
@@ -1028,25 +946,24 @@ function build_stranded_kmer_graph(canonical_kmers, observations)
     stranded_kmer_graph.gprops[:K] = length(stranded_kmers)
     stranded_kmer_graph.gprops[:observation_color_map] = Vector{Int}()
     stranded_kmer_graph.gprops[:observation_ids] = Vector{String}()
-    stranded_kmer_graph.gprops[:observed_paths] = Vector{Vector{Int}}()
+    stranded_kmer_graph.gprops[:observed_paths] = Vector{Vector{Pair{Int, Bool}}}()
     for vertex in 1:LightGraphs.nv(stranded_kmer_graph)
         stranded_kmer_graph.vprops[vertex] = Dict(:coverage => Vector{Pair{Int, Pair{Int, Bool}}}())
     end
-    for observation in observations
+    for (observation_index, observation) in enumerate(observations)
         observation_id = BioSequences.FASTA.identifier(observation)
         observed_sequence = BioSequences.FASTA.sequence(observation)
         if length(observed_sequence) < stranded_kmer_graph.gprops[:k]
-            @warn "skipping sequence shorter than k with id $observation_id & length $(length(observed_sequence))"
+            @error "skipping sequence shorter than k with id $observation_id & length $(length(observed_sequence))"
         else
-            observation_index = length(stranded_kmer_graph.gprops[:observed_paths]) + 1
             observed_path = sequence_to_stranded_path(stranded_kmer_graph.gprops[:stranded_kmers], observed_sequence)
             i = 1
-            ui = observed_path[i]
-            ui_coverage = (observation_index => (i => true))
+            ui, ui_orientation = observed_path[i]
+            ui_coverage = (observation_index => (i => ui_orientation ))
             push!(stranded_kmer_graph.vprops[ui][:coverage], ui_coverage)
             for i in 2:length(observed_path)
-                vi = observed_path[i]
-                vi_coverage = (observation_index => (i => true))
+                vi, vi_orientation = observed_path[i]
+                vi_coverage = (observation_index => (i => vi_orientation))
                 push!(stranded_kmer_graph.vprops[vi][:coverage], vi_coverage)
                 edge_coverage = ui_coverage => vi_coverage
                 if LightGraphs.has_edge(stranded_kmer_graph, ui, vi)
@@ -1054,12 +971,13 @@ function build_stranded_kmer_graph(canonical_kmers, observations)
                 else
                     LightGraphs.add_edge!(stranded_kmer_graph, ui, vi, Dict(:coverage => [edge_coverage]))
                 end
-                ui′ = stranded_kmer_graph.gprops[:reverse_complement_map][ui]
-                vi′ = stranded_kmer_graph.gprops[:reverse_complement_map][vi]
-                if !LightGraphs.has_edge(stranded_kmer_graph, vi′, ui′)
-                    LightGraphs.add_edge!(stranded_kmer_graph, vi′, ui′, Dict(:coverage => Vector{typeof(edge_coverage)}()))
-                end
-                ui = vi
+                # not sure this is necessary
+#                 ui′ = stranded_kmer_graph.gprops[:reverse_complement_map][ui]
+#                 vi′ = stranded_kmer_graph.gprops[:reverse_complement_map][vi]
+#                 if !LightGraphs.has_edge(stranded_kmer_graph, vi′, ui′)
+#                     LightGraphs.add_edge!(stranded_kmer_graph, vi′, ui′, Dict(:coverage => Vector{typeof(edge_coverage)}()))
+#                 end
+                ui, ui_orientation = vi, vi_orientation
                 ui_coverage = vi_coverage
             end
             push!(stranded_kmer_graph.gprops[:observed_paths], observed_path)
@@ -1068,6 +986,55 @@ function build_stranded_kmer_graph(canonical_kmers, observations)
         end
     end
     return stranded_kmer_graph
+end
+    
+"""
+    build_canonical_kmer_graph(canonical_kmers, observations)
+
+Create a weighted kmer (de bruijn) graph from a set of kmers
+and a series of sequence observations in FASTA format.
+"""
+function build_canonical_kmer_graph(canonical_kmers, observations)
+    canonical_kmer_graph = MetaGraphs.MetaGraph(length(canonical_kmers))
+    canonical_kmer_graph.gprops[:canonical_kmers] = canonical_kmers
+    canonical_kmer_graph.gprops[:k] = length(first(canonical_kmers))
+    canonical_kmer_graph.gprops[:K] = length(canonical_kmers)
+    canonical_kmer_graph.gprops[:observation_color_map] = Vector{Int}()
+    canonical_kmer_graph.gprops[:observation_ids] = Vector{String}()
+    canonical_kmer_graph.gprops[:observed_paths] = Vector{Vector{Pair{Int, Bool}}}()
+    for vertex in 1:LightGraphs.nv(canonical_kmer_graph)
+        canonical_kmer_graph.vprops[vertex] = Dict(:coverage => Vector{Pair{Int, Pair{Int, Bool}}}())
+    end
+    for (observation_index, observation) in enumerate(observations)
+        observation_id = BioSequences.FASTA.identifier(observation)
+        observed_sequence = BioSequences.FASTA.sequence(observation)
+        if length(observed_sequence) < canonical_kmer_graph.gprops[:k]
+            @error "sequence shorter than k with id $observation_id & length $(length(observed_sequence))"
+        else
+            observed_path = sequence_to_canonical_path(canonical_kmer_graph.gprops[:canonical_kmers], observed_sequence)
+            i = 1
+            ui, ui_orientation = observed_path[i]
+            ui_coverage = (observation_index => (i => ui_orientation))
+            push!(canonical_kmer_graph.vprops[ui][:coverage], ui_coverage)
+            for i in 2:length(observed_path)
+                vi, vi_orientation = observed_path[i]
+                vi_coverage = (observation_index => (i => vi_orientation))
+                push!(canonical_kmer_graph.vprops[vi][:coverage], vi_coverage)
+                edge_coverage = ui_coverage => vi_coverage
+                if LightGraphs.has_edge(canonical_kmer_graph, ui, vi)
+                    push!(canonical_kmer_graph.eprops[LightGraphs.Edge(ui, vi)][:coverage], edge_coverage)
+                else
+                    LightGraphs.add_edge!(canonical_kmer_graph, ui, vi, Dict(:coverage => [edge_coverage]))
+                end
+                ui, ui_orientation = vi, vi_orientation
+                ui_coverage = vi_coverage
+            end
+        end
+        push!(canonical_kmer_graph.gprops[:observed_paths], observed_path)
+        push!(canonical_kmer_graph.gprops[:observation_ids], observation_id)
+        push!(canonical_kmer_graph.gprops[:observation_color_map], observation_index)
+    end
+    return canonical_kmer_graph
 end
 
 function determine_file_type(file)
@@ -1088,53 +1055,6 @@ function open_file(file)
         return open(file)
     end
 end
-
-# # function normalize!(stranded_kmer_graph)
-# for vertex in vertices(stranded_kmer_graph)
-#     @show stranded_kmer_graph.vprops[vertex][:coverage]
-# end
-# for vertex in vertices(stranded_kmer_graph)
-#     revcom_vertex = stranded_kmer_graph.gprops[:reverse_complement_map][vertex]
-#     for coverage in stranded_kmer_graph.vprops[vertex][:coverage]
-#         revcom_coverage = (coverage.first => (coverage.second.first => !coverage.second.second))
-#         push!(stranded_kmer_graph.vprops[revcom_vertex][:coverage], revcom_coverage)
-#     end
-# end
-# for vertex in vertices(stranded_kmer_graph)
-#     sort!(unique!(stranded_kmer_graph.vprops[vertex][:coverage]))
-# end
-# for vertex in vertices(stranded_kmer_graph)
-#     @show stranded_kmer_graph.vprops[vertex][:coverage]
-# end
-# for edge in edges(stranded_kmer_graph)
-#     @show stranded_kmer_graph.eprops[edge][:coverage]
-# end
-# for edge in edges(stranded_kmer_graph)
-#     ui′ = stranded_kmer_graph.gprops[:reverse_complement_map][edge.src]
-#     vi′ = stranded_kmer_graph.gprops[:reverse_complement_map][edge.dst]
-#     revcom_edge = Edge(vi′, ui′)
-#     for coverage_index in 1:length(stranded_kmer_graph.eprops[edge][:coverage])
-#         coverage = stranded_kmer_graph.eprops[edge][:coverage][coverage_index]
-#         observation_index = coverage.first.first
-#         u_i = coverage.first.second.first
-#         u_orientation = coverage.first.second.second
-#         v_i = coverage.second.second.first
-#         v_orientation = coverage.second.second.second
-#         revcom_coverage = (observation_index => (v_i => !v_orientation)) =>
-#                           (observation_index => (u_i => !u_orientation))
-#         push!(stranded_kmer_graph.eprops[revcom_edge][:coverage], revcom_coverage)
-#     end
-# end
-# for edge in edges(stranded_kmer_graph)
-#     @show stranded_kmer_graph.eprops[edge][:coverage]
-#     sort!(unique!(stranded_kmer_graph.eprops[edge][:coverage]))
-#     @show stranded_kmer_graph.eprops[edge][:coverage]
-# end
-# viterbi_maximum_likelihood_traversals(stranded_kmer_graph, error_rate = 0.0, verbosity="debug");
-#
-# # end
-# # just take all of the edges and their reverse complements and all of the nodes and their reverse complements and merge and sort the evidence
-
 
 function plot_histogram(parsed_args)
     lines = strip.(readlines(open_file(parsed_args["histogram"])))
