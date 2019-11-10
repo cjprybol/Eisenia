@@ -854,6 +854,156 @@ function plot_stranded_kmer_graph(stranded_kmer_graph; filename=Random.randstrin
     Luxor.finish()
 end
 
+
+function plot_canonical_kmer_graph(canonical_kmer_graph; filename=Random.randstring(Random.MersenneTwister(Int(round(time()))), 3) * ".svg")
+    textsize = 12
+    radius = textsize/2
+
+    current_global_x_min = 0
+    current_global_y_min = 0
+    current_global_x_max = 0
+    current_global_y_max = 0
+
+    canonical_vertex_coordinates = [Dict{Symbol, Any}() for vertex in LightGraphs.vertices(canonical_kmer_graph)]
+
+    for connected_component in LightGraphs.connected_components(canonical_kmer_graph)
+        # reset xmin to left-align new contigs
+        current_contig_x_min = current_global_x_min
+        current_contig_x_max = current_global_x_min
+        current_contig_y_min = current_global_y_max
+        current_contig_y_max = current_global_y_max
+        ## TODO could also achor by vertex with the smallest indegree
+        anchor = minimum(connected_component)
+        canonical_bfs_tree = LightGraphs.bfs_tree(canonical_kmer_graph, anchor)
+        vertices_in_current_depth_of_field = [anchor]
+        while !isempty(vertices_in_current_depth_of_field)
+            vertices_in_next_depth_of_field = Vector{Int}()
+            current_vertex_x_min = current_contig_x_max
+            current_vertex_y_min = current_contig_y_min
+            max_coverage = 0
+            for vertex in vertices_in_current_depth_of_field
+                coverage = length(canonical_kmer_graph.vprops[vertex][:coverage])
+                if coverage > max_coverage
+                    max_coverage = coverage
+                end
+            end
+            for vertex in vertices_in_current_depth_of_field
+                coverage = length(canonical_kmer_graph.vprops[vertex][:coverage])
+                above_y_offset = 10 + coverage + radius
+                below_y_offset = 10 + coverage + radius
+                before_x_offset = 10 + max_coverage
+                after_x_offset = 10 + max_coverage
+                cvc = canonical_vertex_coordinates[vertex]
+                cvc[:height] = textsize + coverage + textsize + 2
+                cvc[:width] = (length(canonical_kmer_graph.gprops[:canonical_kmers][vertex]) + 1) * textsize
+                cvc[:xmin] = current_vertex_x_min + before_x_offset
+                cvc[:xmax] = cvc[:xmin] + cvc[:width]
+                cvc[:ymin] = current_vertex_y_min + above_y_offset
+                cvc[:ymax] = cvc[:ymin] + cvc[:height]
+                cvc[:coverage_to_y_map] = [cvc[:ymin] + textsize + i for i in 1:coverage]
+                cvc[:center] = Luxor.Point(Statistics.mean((cvc[:xmin], cvc[:xmax])), Statistics.mean((cvc[:ymin], cvc[:ymax])))
+
+                if cvc[:xmax] + after_x_offset + radius > current_contig_x_max
+                    current_contig_x_max = cvc[:xmax] + after_x_offset + radius
+                end
+                if cvc[:ymax] + coverage + radius > current_contig_y_max
+                    current_contig_y_max = cvc[:ymax] + coverage + radius
+                end
+                current_vertex_y_min = cvc[:ymax] + coverage
+                for neighbor in LightGraphs.outneighbors(canonical_bfs_tree, vertex)
+                    push!(vertices_in_next_depth_of_field, neighbor)
+                end
+            end
+            current_vertex_x_min = current_contig_x_max
+            vertices_in_current_depth_of_field = sort!(unique(vertices_in_next_depth_of_field))
+        end
+        if current_contig_x_max > current_global_x_max
+            current_global_x_max = current_contig_x_max
+        end
+        if current_contig_y_max > current_global_y_max
+            current_global_y_max = current_contig_y_max
+        end
+    end
+
+    Luxor.Drawing(current_global_x_max, current_global_y_max, filename)
+    Luxor.background("white")
+    Luxor.setline(1)
+    ncolors = length(canonical_kmer_graph.gprops[:observation_ids])
+    color_list = Colors.distinguishable_colors(ncolors+1, Colors.RGB(1,1,1))[2:end]
+    for sequence_record_index in 1:length(canonical_kmer_graph.gprops[:observed_paths])
+        sequence_path = canonical_kmer_graph.gprops[:observed_paths][sequence_record_index]
+        sequence_color = color_list[canonical_kmer_graph.gprops[:observation_color_map][sequence_record_index]]
+        i = 1
+        ui = first(sequence_path[i])
+        uiis = findall(observation -> first(observation) == sequence_record_index, canonical_kmer_graph.vprops[ui][:coverage])
+        @assert length(uiis) == 1
+        uii = first(uiis)
+        ux = canonical_vertex_coordinates[ui][:xmax]
+        uy = canonical_vertex_coordinates[ui][:coverage_to_y_map][uii]
+        Luxor.setcolor(sequence_color)
+        for i in 2:length(sequence_path)
+            vi = first(sequence_path[i])
+            canonical_kmer_graph.vprops[vi][:coverage]
+            viis = findall(observation -> first(observation) == sequence_record_index, canonical_kmer_graph.vprops[vi][:coverage])
+            @assert length(viis) == 1
+            vii = first(viis)
+            vy = canonical_vertex_coordinates[vi][:coverage_to_y_map][vii]
+            vx = canonical_vertex_coordinates[vi][:xmin]
+            u_radius = radius + uii - 1
+            v_radius = radius + vii - 1
+            a = Luxor.Point(ux, uy)
+            b = Luxor.Point(Statistics.mean((ux, vx)), uy)
+            c = Luxor.Point(Statistics.mean((ux, vx)), vy)
+            d = Luxor.Point(vx, vy)
+            Luxor.move(a); Luxor.curve(b, c, d); Luxor.strokepath()
+            ui = vi
+            uii = vii
+            ux = canonical_vertex_coordinates[ui][:xmax]
+            uy = canonical_vertex_coordinates[ui][:coverage_to_y_map][uii]
+        end
+    end
+    for vertex in LightGraphs.vertices(canonical_kmer_graph)
+        height = canonical_vertex_coordinates[vertex][:height]
+        width = canonical_vertex_coordinates[vertex][:width]
+        center = canonical_vertex_coordinates[vertex][:center]
+        Luxor.setcolor("gray")
+        Luxor.box(center, width, height, :fill)
+        for (i, y) in enumerate(canonical_vertex_coordinates[vertex][:coverage_to_y_map])
+            record_index, (sequence_index, orientation) = canonical_kmer_graph.vprops[vertex][:coverage][i]
+            color_index = canonical_kmer_graph.gprops[:observation_color_map][record_index]
+            Luxor.setcolor(color_list[color_index])
+            Luxor.line(Luxor.Point(canonical_vertex_coordinates[vertex][:xmin], y), Luxor.Point(canonical_vertex_coordinates[vertex][:xmax], y), :stroke)
+            Luxor.setcolor("white")
+            Luxor.fontsize(1)
+            Luxor.fontface("Menlo Bold")
+            if orientation == true
+                Luxor.text(string(sequence_index), Luxor.Point(canonical_vertex_coordinates[vertex][:xmin] + 1, y), valign=:middle, halign=:center)
+            else
+                Luxor.text(string(sequence_index), Luxor.Point(canonical_vertex_coordinates[vertex][:xmax] - 1, y), valign=:middle, halign=:center)
+            end
+            if sequence_index == 1
+                if orientation == true
+                    Luxor.circle(Luxor.Point(canonical_vertex_coordinates[vertex][:xmin] + 2, y), 0.5, :fill)
+                else
+                    Luxor.circle(Luxor.Point(canonical_vertex_coordinates[vertex][:xmax] - 2, y), 0.5, :fill)
+                end
+            end
+        end
+        plus_sequence = canonical_kmer_graph.gprops[:canonical_kmers][vertex]
+        Luxor.setcolor("white")
+        Luxor.fontsize(textsize)
+        Luxor.fontface("Menlo")
+        x = canonical_vertex_coordinates[vertex][:center].x
+        y = Statistics.mean((canonical_vertex_coordinates[vertex][:ymin], canonical_vertex_coordinates[vertex][:center].y))
+        Luxor.text(string(plus_sequence), Luxor.Point(x, y), valign=:middle, halign=:center)
+        
+        minus_sequence = BioSequences.reverse_complement(plus_sequence)
+        y = Statistics.mean((canonical_vertex_coordinates[vertex][:ymax], canonical_vertex_coordinates[vertex][:center].y))
+        Luxor.text(string(minus_sequence), Luxor.Point(x, y), valign=:middle, halign=:center)
+    end
+    Luxor.finish()
+end
+
 """
 document me
 """
