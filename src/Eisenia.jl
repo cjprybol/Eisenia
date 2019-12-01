@@ -19,6 +19,8 @@ import DataFrames
 # import Distances
 # import Distributions
 import GLM
+# for storing VCF format calls
+import GeneticVariation
 # import IterTools
 # import JLD2
 # @reexport import LightGraphs
@@ -34,7 +36,6 @@ import Plots
 import Random
 # import StaticArrays
 import Statistics
-# import StatsBase
 
 const NUCLEOTIDES =
     [BioSequences.DNA_A,
@@ -894,7 +895,7 @@ function plot_canonical_kmer_graph(canonical_kmer_graph; filename=Random.randstr
                 before_x_offset = 10 + max_coverage
                 after_x_offset = 10 + max_coverage
                 cvc = canonical_vertex_coordinates[vertex]
-                cvc[:height] = textsize + coverage + textsize + 2
+                cvc[:height] = textsize + coverage + textsize + 1
                 cvc[:width] = (length(canonical_kmer_graph.gprops[:canonical_kmers][vertex]) + 1) * textsize
                 cvc[:xmin] = current_vertex_x_min + before_x_offset
                 cvc[:xmax] = cvc[:xmin] + cvc[:width]
@@ -973,21 +974,13 @@ function plot_canonical_kmer_graph(canonical_kmer_graph; filename=Random.randstr
             color_index = canonical_kmer_graph.gprops[:observation_color_map][record_index]
             Luxor.setcolor(color_list[color_index])
             Luxor.line(Luxor.Point(canonical_vertex_coordinates[vertex][:xmin], y), Luxor.Point(canonical_vertex_coordinates[vertex][:xmax], y), :stroke)
-            Luxor.setcolor("white")
-            Luxor.fontsize(1)
-            Luxor.fontface("Menlo Bold")
-            if orientation == true
-                Luxor.text(string(sequence_index), Luxor.Point(canonical_vertex_coordinates[vertex][:xmin] + 1, y), valign=:middle, halign=:center)
-            else
-                Luxor.text(string(sequence_index), Luxor.Point(canonical_vertex_coordinates[vertex][:xmax] - 1, y), valign=:middle, halign=:center)
-            end
-            if sequence_index == 1
-                if orientation == true
-                    Luxor.circle(Luxor.Point(canonical_vertex_coordinates[vertex][:xmin] + 2, y), 0.5, :fill)
-                else
-                    Luxor.circle(Luxor.Point(canonical_vertex_coordinates[vertex][:xmax] - 2, y), 0.5, :fill)
-                end
-            end
+#             Luxor.setcolor("white")
+#             Luxor.fontsize(1)
+#             Luxor.fontface("Menlo Bold")
+#             Luxor.text(string(sequence_index), Luxor.Point(canonical_vertex_coordinates[vertex][:xmin] + 1, y), valign=:middle, halign=:center)
+#             if sequence_index == 1
+#                 Luxor.circle(Luxor.Point(canonical_vertex_coordinates[vertex][:xmin] + 2, y), 0.5, :fill)
+#             end
         end
         plus_sequence = canonical_kmer_graph.gprops[:canonical_kmers][vertex]
         Luxor.setcolor("white")
@@ -1085,6 +1078,11 @@ Create a weighted, strand-specific kmer (de bruijn) graph from a set of kmers
 and a series of sequence observations in FASTA format.
 """
 function build_stranded_kmer_graph(canonical_kmers, observations)
+    if isempty(canonical_kmers)
+        @error "isempty(canonical_kmers) = $(isempty(canonical_kmers))"
+    elseif isempty(observations)
+        @error "isempty(observations) = $(isempty(observations))"
+    end
     stranded_kmers = sort!(vcat(canonical_kmers, [BioSequences.reverse_complement(kmer) for kmer in canonical_kmers]))
     stranded_kmer_to_reverse_complement_map = [
         findfirst(stranded_kmer -> BioSequences.reverse_complement(stranded_kmer) == kmer, stranded_kmers) for kmer in stranded_kmers
@@ -1187,6 +1185,82 @@ function build_canonical_kmer_graph(canonical_kmers, observations)
     return canonical_kmer_graph
 end
 
+
+"""
+    report_graph_structure(canonical_kmer_graph)
+
+Return the primary contigs of an assembly graph in fasta format
+with lower-coverage alternate paths in VCF format
+"""
+function report_graph_structure(canonical_kmer_graph)
+    k = canonical_kmer_graph.gprops[:k]
+    sequences = BioSequences.FASTA.Record[]
+    variants = GeneticVariation.VCF.Record[]
+    # return the dominant path(s) as fasta with coverage info
+    for (i, connected_component) in enumerate(LightGraphs.connected_components(canonical_kmer_graph))
+        maximum_weight = maximum(v -> length(canonical_kmer_graph.vprops[v][:coverage]), connected_component)
+        maximum_weight_indices = findall(v -> length(canonical_kmer_graph.vprops[v][:coverage]) == maximum_weight, connected_component)
+        initial_vertex = connected_component[rand(maximum_weight_indices)]
+        true_walk = []
+        current_vertex = initial_vertex
+        # make a collection of all next steps and choose the step with the most agreement
+        for coverage in canonical_kmer_graph.vprops[current_vertex][:coverage]
+            (o, (oi, oo)) = coverage
+            if oo
+                next_step = o => (oi+1 => oo)
+            else
+                next_step = o => (oi-1 => oo)
+            end
+            for neighbor in LightGraphs.neighbors(canonical_kmer_graph, current_vertex)
+                if next_step in canonical_kmer_graph.vprops[neighbor][:coverage]
+                    push!(true_walk, (neighbor => true))
+                end
+            end
+        end
+        false_walk = []
+        current_vertex = initial_vertex
+        # make a collection of all next steps and choose the step with the most agreement
+        for coverage in canonical_kmer_graph.vprops[current_vertex][:coverage]
+            (o, (oi, oo)) = coverage
+            if oo
+                next_step = o => (oi-1 => oo)
+            else
+                next_step = o => (oi+1 => oo)
+            end
+            for neighbor in LightGraphs.neighbors(canonical_kmer_graph, current_vertex)
+                if next_step in canonical_kmer_graph.vprops[neighbor][:coverage]
+                    push!(false_walk, (neighbor => false))
+                end
+            end
+        end
+        reverse_complemented_false_walk = [vertex => !orientation for (vertex, orientation) in false_walk[end:-1:1]]
+        path = [reverse_complemented_false_walk..., initial_vertex => true, true_walk...]
+        (vertex, orientation) = first(path)
+        kmer = canonical_kmer_graph.gprops[:canonical_kmers][vertex]
+        if !orientation
+            kmer = BioSequences.reverse_complement(kmer)
+        end
+        initial_sequence = BioSequences.DNASequence(kmer)
+        path_sequence = initial_sequence
+        for (vertex, orientation) in path[2:end]
+            kmer = canonical_kmer_graph.gprops[:canonical_kmers][vertex]
+            if !orientation
+                kmer = BioSequences.reverse_complement(kmer)
+            end
+            sequence = BioSequences.DNASequence(kmer)
+            sequence
+            sequence_prefix = sequence[1:end-1]
+            path_sequence_suffix = path_sequence[end-(k-2):end]
+            @assert sequence_prefix == path_sequence_suffix
+            push!(path_sequence, sequence[end])
+        end
+        push!(sequences, BioSequences.FASTA.Record("$i", path_sequence))
+        # figure out variants and push variants to variants list
+        # find which nodes in connected component aren't in path yet
+    end
+    return (sequences = sequences, variants = variants)
+end
+
 function determine_file_type(file)
     if endswith(file, ".gz")
         file = file[1:end-3]
@@ -1267,6 +1341,32 @@ function plot_rank_frequency(parsed_args)
             X2, Y2),
             0, 1, Plots.text("r = $(round(cor(X, Y), digits=2))", 10, :left)),
             filename * ".png");
+end
+
+function count_canonical_kmers(observations, k)
+    # naive method, just counts everything in memory
+    # disk-based method, writes everything to memory mapped arrays
+    # for memory mapping, can
+    # 1) infer nothing and just keep doubling the size of the arrays as we run out of space
+    # 2) determine worst-case scenarios, build those arrays, and trim after we're done
+    # 3) Read the first 100Mb of data, infer Michaelis-Menton Vmax, and set array size to (double?) that
+    kmer_type = BioSequences.DNAKmer{k}
+    canonical_kmer_counts = Dict{kmer_type, Int}()
+    for observation in observations
+        observed_sequence =  BioSequences.FASTA.sequence(observation)
+        l = length(observed_sequence)
+        l < k && error("length of observed sequence $l is less than k $k")
+        for (index, kmer) in BioSequences.each(kmer_type, observed_sequence)
+            canonical_kmer = BioSequences.canonical(kmer)
+            if haskey(canonical_kmer_counts, canonical_kmer)
+                canonical_kmer_counts[canonical_kmer] += 1
+            else
+                canonical_kmer_counts[canonical_kmer] = 1
+            end
+        end
+    end
+    sorted_canonical_kmer_counts = sort(canonical_kmer_counts)
+    return collect(keys(sorted_canonical_kmer_counts)), collect(values(sorted_canonical_kmer_counts))
 end
 
 end
