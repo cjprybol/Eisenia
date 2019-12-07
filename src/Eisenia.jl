@@ -36,6 +36,8 @@ import Plots
 import Random
 # import StaticArrays
 import Statistics
+import Distributions
+import StatsBase
 
 const NUCLEOTIDES =
     [BioSequences.DNA_A,
@@ -55,6 +57,46 @@ function sequence_to_stranded_path(stranded_kmers, sequence)
         push!(path, kmer_index => orientation)
     end
     return path
+end
+
+"""
+document me
+"""
+function observe(fasta_record;
+                 error_rate=0,
+                 read_length = length(BioSequences.FASTA.sequence(fasta_record)),
+                 identifier_length = Int(round(log10(read_length)))+11)
+    reference_sequence = BioSequences.FASTA.sequence(fasta_record)
+    start_index = rand(1:length(reference_sequence)-read_length+1)
+    sequence_range = start_index:start_index+read_length-1
+    ## should record alignment info here for writing reference alignment information
+    reference_sequence_observation = reference_sequence[sequence_range]
+    if rand([:forward, :reverse_complement]) == :reverse_complement
+        reference_sequence_observation = BioSequences.reverse_complement(reference_sequence_observation)
+    end
+    if error_rate == 0
+        observed_sequence = reference_sequence_observation
+    else
+        observed_sequence = BioSequences.DNASequence()
+        for correct_base in reference_sequence_observation
+            is_an_error = Bool(rand(Distributions.Bernoulli(error_rate)))
+            if is_an_error
+                error_type = rand([:mismatch, :insertion, :deletion])
+                if error_type == :mismatch
+                    push!(observed_sequence, rand(NUCLEOTIDES))
+                elseif error_type == :insertion
+                    push!(observed_sequence, rand(NUCLEOTIDES))
+                    push!(observed_sequence, correct_base)
+                elseif error_type == :deletion
+                    continue
+                end
+            else
+                push!(observed_sequence, correct_base)
+            end
+        end
+    end
+    identifier = Random.randstring(identifier_length)
+    return BioSequences.FASTA.Record(identifier, observed_sequence)
 end
 
 """
@@ -1161,6 +1203,7 @@ function build_canonical_kmer_graph(canonical_kmers, observations)
         else
             observed_path = sequence_to_canonical_path(canonical_kmer_graph.gprops[:canonical_kmers], observed_sequence)
             i = 1
+#             @show observed_path
             ui, ui_orientation = observed_path[i]
             ui_coverage = (observation_index => (i => ui_orientation))
             push!(canonical_kmer_graph.vprops[ui][:coverage], ui_coverage)
@@ -1168,9 +1211,13 @@ function build_canonical_kmer_graph(canonical_kmers, observations)
                 vi, vi_orientation = observed_path[i]
                 vi_coverage = (observation_index => (i => vi_orientation))
                 push!(canonical_kmer_graph.vprops[vi][:coverage], vi_coverage)
+#                 @show i, ui, ui_orientation
+#                 @show i, vi, vi_orientation
                 edge_coverage = ui_coverage => vi_coverage
+#                 @show LightGraphs.has_edge(canonical_kmer_graph, ui, vi)
+#                 @show edge_coverage
                 if LightGraphs.has_edge(canonical_kmer_graph, ui, vi)
-                    push!(canonical_kmer_graph.eprops[LightGraphs.Edge(ui, vi)][:coverage], edge_coverage)
+                    push!(canonical_kmer_graph.eprops[LightGraphs.Edge(sort([ui, vi])...)][:coverage], edge_coverage)
                 else
                     LightGraphs.add_edge!(canonical_kmer_graph, ui, vi, Dict(:coverage => [edge_coverage]))
                 end
@@ -1183,6 +1230,50 @@ function build_canonical_kmer_graph(canonical_kmers, observations)
         push!(canonical_kmer_graph.gprops[:observation_color_map], observation_index)
     end
     return canonical_kmer_graph
+end
+
+function walk(canonical_kmer_graph, initial_vertex, initial_orientation)
+    current_vertex = initial_vertex
+    current_orientation = initial_orientation
+    walk = []
+    done = false
+    while !done
+        potential_next_steps = []
+        current_vertex_coverage = canonical_kmer_graph.vprops[current_vertex][:coverage]
+        for coverage in current_vertex_coverage
+            (observation, (index, orientation)) = coverage
+            observation_path = canonical_kmer_graph.gprops[:observed_paths][observation]
+            # if true current orientation then we want to go up in trues and down in falses
+            if current_orientation
+                if orientation
+                    next_index = index + 1
+                else
+                    next_index = index - 1
+                end
+            else
+                if orientation
+                    next_index = index - 1
+                else
+                    next_index = index + 1
+                end
+            end
+            if next_index in eachindex(observation_path)
+                next_vertex, next_orientation = observation_path[next_index]
+                if next_index < index
+                    next_orientation = !next_orientation
+                end
+                push!(potential_next_steps, next_vertex => next_orientation)
+            end
+        end
+        if isempty(potential_next_steps)
+            done = true
+        else
+            next_step = first(first(sort(StatsBase.countmap(potential_next_steps), by=x->x[2])))
+            push!(walk, next_step)
+            current_vertex, current_orientation = next_step
+        end
+    end
+    return walk
 end
 
 
@@ -1201,38 +1292,10 @@ function report_graph_structure(canonical_kmer_graph)
         maximum_weight = maximum(v -> length(canonical_kmer_graph.vprops[v][:coverage]), connected_component)
         maximum_weight_indices = findall(v -> length(canonical_kmer_graph.vprops[v][:coverage]) == maximum_weight, connected_component)
         initial_vertex = connected_component[rand(maximum_weight_indices)]
-        true_walk = []
-        current_vertex = initial_vertex
-        # make a collection of all next steps and choose the step with the most agreement
-        for coverage in canonical_kmer_graph.vprops[current_vertex][:coverage]
-            (o, (oi, oo)) = coverage
-            if oo
-                next_step = o => (oi+1 => oo)
-            else
-                next_step = o => (oi-1 => oo)
-            end
-            for neighbor in LightGraphs.neighbors(canonical_kmer_graph, current_vertex)
-                if next_step in canonical_kmer_graph.vprops[neighbor][:coverage]
-                    push!(true_walk, (neighbor => true))
-                end
-            end
-        end
-        false_walk = []
-        current_vertex = initial_vertex
-        # make a collection of all next steps and choose the step with the most agreement
-        for coverage in canonical_kmer_graph.vprops[current_vertex][:coverage]
-            (o, (oi, oo)) = coverage
-            if oo
-                next_step = o => (oi-1 => oo)
-            else
-                next_step = o => (oi+1 => oo)
-            end
-            for neighbor in LightGraphs.neighbors(canonical_kmer_graph, current_vertex)
-                if next_step in canonical_kmer_graph.vprops[neighbor][:coverage]
-                    push!(false_walk, (neighbor => false))
-                end
-            end
-        end
+
+        true_walk = walk(canonical_kmer_graph, initial_vertex, true)
+        false_walk = walk(canonical_kmer_graph, initial_vertex, false)
+
         reverse_complemented_false_walk = [vertex => !orientation for (vertex, orientation) in false_walk[end:-1:1]]
         path = [reverse_complemented_false_walk..., initial_vertex => true, true_walk...]
         (vertex, orientation) = first(path)
