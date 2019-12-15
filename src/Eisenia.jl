@@ -1268,7 +1268,10 @@ function walk(canonical_kmer_graph, initial_vertex, initial_orientation)
         if isempty(potential_next_steps)
             done = true
         else
-            next_step = first(first(sort(StatsBase.countmap(potential_next_steps), by=x->x[2])))
+            step_votes = StatsBase.countmap(potential_next_steps)
+            max_count = maximum(values(step_votes))
+            all_best_steps = filter(step_vote -> step_vote[2] == max_count, step_votes)
+            next_step = first(rand(all_best_steps))
             push!(walk, next_step)
             current_vertex, current_orientation = next_step
         end
