@@ -36,3 +36,26 @@ developing packages outside of the standard Julia locations
 mkdir ~/.julia/config
 echo 'push!(LOAD_PATH, expanduser("~/Repos/Eisenia/src"))' > ~/.julia/config/startup.jl
 ```
+
+config file = fastq files -> [group]
+if no group provided then everything is the same group
+
+every fastq file is counted at 7, 11, 13, 17, ... primes until linear r squared detected
+assess how this varies depending on error rate, do we need to exclude kmers with counts < 2? That's the quickest way to remove errors
+
+take kmer list and initialize graph nodes
+
+read through reads and build edges
+
+read through reads and return most likely reads
+
+reads > kmers
+kmers > graph nodes
+graph nodes + reads > edges
+nodes + edges + reads > maximum likelihood reads
+
+repeat until convergence
+
+use jellyfish for kmer counting
+use https://github.com/GATB/bcalm for graph building
+use graph + reads for error correction
