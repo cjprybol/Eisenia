@@ -61,3 +61,16 @@ use https://github.com/GATB/bcalm for graph building
 use graph + reads for error correction
 
 refseq complete -> https://ftp.ncbi.nih.gov/refseq/release/complete/
+
+kraken parameters
+
+--memory-mapping
+
+archaea: RefSeq complete archaeal genomes/proteins
+bacteria: RefSeq complete bacterial genomes/proteins
+plasmid: RefSeq plasmid nucleotide/protein sequences
+viral: RefSeq complete viral genomes/proteins
+human: GRCh38 human genome/proteins
+fungi: RefSeq complete fungal genomes/proteins
+plant: RefSeq complete plant genomes/proteins
+protozoa: RefSeq complete protozoan genomes/proteins
