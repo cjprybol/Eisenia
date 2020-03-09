@@ -59,3 +59,5 @@ repeat until convergence
 use jellyfish for kmer counting
 use https://github.com/GATB/bcalm for graph building
 use graph + reads for error correction
+
+refseq complete -> https://ftp.ncbi.nih.gov/refseq/release/complete/
