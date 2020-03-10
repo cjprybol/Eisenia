@@ -66,11 +66,4 @@ kraken parameters
 
 --memory-mapping
 
-archaea: RefSeq complete archaeal genomes/proteins
-bacteria: RefSeq complete bacterial genomes/proteins
-plasmid: RefSeq plasmid nucleotide/protein sequences
-viral: RefSeq complete viral genomes/proteins
-human: GRCh38 human genome/proteins
-fungi: RefSeq complete fungal genomes/proteins
-plant: RefSeq complete plant genomes/proteins
-protozoa: RefSeq complete protozoan genomes/proteins
+https://ccb.jhu.edu/software/kraken2/index.shtml?t=manual#custom-databases with refseq complete
