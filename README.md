@@ -36,7 +36,7 @@ developing packages outside of the standard Julia locations
 mkdir ~/.julia/config
 echo 'push!(LOAD_PATH, expanduser("~/Repos/Eisenia/src"))' > ~/.julia/config/startup.jl
 ```
-
+```
 config file = fastq files -> [group]
 if no group provided then everything is the same group
 
@@ -77,6 +77,9 @@ blast with nr
 kraken2 with nt
 
 ./install_kraken2.sh $KRAKEN2_DIR
+sudo apt install rsync
+# or use  --use-ftp
 kraken2-build --download-taxonomy --db $DBNAME
 kraken2-build --download-library nt --db $DBNAME
 kraken2 --db $DBNAME seqs.fa
+```
