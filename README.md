@@ -65,3 +65,4 @@ use prodigal for annotating orfs
 use locus pipeline for annotation
 
 https://genomebiology.biomedcentral.com/articles/10.1186/s13059-018-1554-6
+```
