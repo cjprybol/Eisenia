@@ -60,10 +60,18 @@ use jellyfish for kmer counting
 use https://github.com/GATB/bcalm for graph building
 use graph + reads for error correction
 
-refseq complete -> https://ftp.ncbi.nih.gov/refseq/release/complete/
+use prodigal for annotating orfs
+
+use locus pipeline for annotation
 
 kraken parameters
 
 --memory-mapping
 
 https://ccb.jhu.edu/software/kraken2/index.shtml?t=manual#custom-databases with refseq complete
+refseq complete -> https://ftp.ncbi.nih.gov/refseq/release/complete/
+^ don't use refseq complete because it requires building myself and it's unclear how non-redundant it is
+
+taxdb
+blast with nr
+kraken2 with nt
