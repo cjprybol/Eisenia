@@ -75,3 +75,8 @@ refseq complete -> https://ftp.ncbi.nih.gov/refseq/release/complete/
 taxdb
 blast with nr
 kraken2 with nt
+
+./install_kraken2.sh $KRAKEN2_DIR
+kraken2-build --download-taxonomy --db $DBNAME
+kraken2-build --download-library nt --db $DBNAME
+kraken2 --db $DBNAME seqs.fa
