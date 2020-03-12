@@ -64,22 +64,5 @@ use prodigal for annotating orfs
 
 use locus pipeline for annotation
 
-kraken parameters
-
---memory-mapping
-
-https://ccb.jhu.edu/software/kraken2/index.shtml?t=manual#custom-databases with refseq complete
-refseq complete -> https://ftp.ncbi.nih.gov/refseq/release/complete/
-^ don't use refseq complete because it requires building myself and it's unclear how non-redundant it is
-
-taxdb
-blast with nr
-kraken2 with nt
-
-./install_kraken2.sh $KRAKEN2_DIR
-sudo apt install rsync
-# or use  --use-ftp
-kraken2-build --download-taxonomy --db $DBNAME
-kraken2-build --download-library nt --db $DBNAME
-kraken2 --db $DBNAME seqs.fa
+https://genomebiology.biomedcentral.com/articles/10.1186/s13059-018-1554-6
 ```
