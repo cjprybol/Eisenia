@@ -4,6 +4,10 @@ digraph {
     A2 [label="x2.fq"]
     A3 [label="x3.fq"]
     
+    A1_counts [label="x1.fq.kraken2.counts"]
+    A2_counts [label="x2.fq.kraken2.counts"]
+    A3_counts [label="x3.fq.kraken2.counts"]
+    
     B1 [label="x1.fq.fastqc.html"]
     B2 [label="x2.fq.fastqc.html"]
     B3 [label="x3.fq.fastqc.html"]
@@ -71,6 +75,10 @@ digraph {
     A1 -> B1
     A2 -> B2
     A3 -> B3
+    
+    A1 -> A1_counts
+    A2 -> A2_counts
+    A3 -> A3_counts
     
     A1 -> C1
     A2 -> C2
