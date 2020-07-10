@@ -20,7 +20,7 @@ import DataFrames
 # import Distributions
 import GLM
 # for storing VCF format calls
-import GeneticVariation
+# import GeneticVariation
 # import IterTools
 # import JLD2
 # @reexport import LightGraphs
@@ -1286,46 +1286,46 @@ end
 Return the primary contigs of an assembly graph in fasta format
 with lower-coverage alternate paths in VCF format
 """
-function report_graph_structure(canonical_kmer_graph)
-    k = canonical_kmer_graph.gprops[:k]
-    sequences = BioSequences.FASTA.Record[]
-    variants = GeneticVariation.VCF.Record[]
-    # return the dominant path(s) as fasta with coverage info
-    for (i, connected_component) in enumerate(LightGraphs.connected_components(canonical_kmer_graph))
-        maximum_weight = maximum(v -> length(canonical_kmer_graph.vprops[v][:coverage]), connected_component)
-        maximum_weight_indices = findall(v -> length(canonical_kmer_graph.vprops[v][:coverage]) == maximum_weight, connected_component)
-        initial_vertex = connected_component[rand(maximum_weight_indices)]
-
-        true_walk = walk(canonical_kmer_graph, initial_vertex, true)
-        false_walk = walk(canonical_kmer_graph, initial_vertex, false)
-
-        reverse_complemented_false_walk = [vertex => !orientation for (vertex, orientation) in false_walk[end:-1:1]]
-        path = [reverse_complemented_false_walk..., initial_vertex => true, true_walk...]
-        (vertex, orientation) = first(path)
-        kmer = canonical_kmer_graph.gprops[:canonical_kmers][vertex]
-        if !orientation
-            kmer = BioSequences.reverse_complement(kmer)
-        end
-        initial_sequence = BioSequences.DNASequence(kmer)
-        path_sequence = initial_sequence
-        for (vertex, orientation) in path[2:end]
-            kmer = canonical_kmer_graph.gprops[:canonical_kmers][vertex]
-            if !orientation
-                kmer = BioSequences.reverse_complement(kmer)
-            end
-            sequence = BioSequences.DNASequence(kmer)
-            sequence
-            sequence_prefix = sequence[1:end-1]
-            path_sequence_suffix = path_sequence[end-(k-2):end]
-            @assert sequence_prefix == path_sequence_suffix
-            push!(path_sequence, sequence[end])
-        end
-        push!(sequences, BioSequences.FASTA.Record("$i", path_sequence))
-        # figure out variants and push variants to variants list
-        # find which nodes in connected component aren't in path yet
-    end
-    return (sequences = sequences, variants = variants)
-end
+# function report_graph_structure(canonical_kmer_graph)
+#     k = canonical_kmer_graph.gprops[:k]
+#     sequences = BioSequences.FASTA.Record[]
+#     variants = GeneticVariation.VCF.Record[]
+#     # return the dominant path(s) as fasta with coverage info
+#     for (i, connected_component) in enumerate(LightGraphs.connected_components(canonical_kmer_graph))
+#         maximum_weight = maximum(v -> length(canonical_kmer_graph.vprops[v][:coverage]), connected_component)
+#         maximum_weight_indices = findall(v -> length(canonical_kmer_graph.vprops[v][:coverage]) == maximum_weight, connected_component)
+#         initial_vertex = connected_component[rand(maximum_weight_indices)]
+# 
+#         true_walk = walk(canonical_kmer_graph, initial_vertex, true)
+#         false_walk = walk(canonical_kmer_graph, initial_vertex, false)
+# 
+#         reverse_complemented_false_walk = [vertex => !orientation for (vertex, orientation) in false_walk[end:-1:1]]
+#         path = [reverse_complemented_false_walk..., initial_vertex => true, true_walk...]
+#         (vertex, orientation) = first(path)
+#         kmer = canonical_kmer_graph.gprops[:canonical_kmers][vertex]
+#         if !orientation
+#             kmer = BioSequences.reverse_complement(kmer)
+#         end
+#         initial_sequence = BioSequences.DNASequence(kmer)
+#         path_sequence = initial_sequence
+#         for (vertex, orientation) in path[2:end]
+#             kmer = canonical_kmer_graph.gprops[:canonical_kmers][vertex]
+#             if !orientation
+#                 kmer = BioSequences.reverse_complement(kmer)
+#             end
+#             sequence = BioSequences.DNASequence(kmer)
+#             sequence
+#             sequence_prefix = sequence[1:end-1]
+#             path_sequence_suffix = path_sequence[end-(k-2):end]
+#             @assert sequence_prefix == path_sequence_suffix
+#             push!(path_sequence, sequence[end])
+#         end
+#         push!(sequences, BioSequences.FASTA.Record("$i", path_sequence))
+#         # figure out variants and push variants to variants list
+#         # find which nodes in connected component aren't in path yet
+#     end
+#     return (sequences = sequences, variants = variants)
+# end
 
 function determine_file_type(file)
     if endswith(file, ".gz")
