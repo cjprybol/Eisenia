@@ -61,18 +61,21 @@ function sequence_to_stranded_path(stranded_kmers, sequence)
 end
 
 """
-observe(fasta_record;
-             error_rate=0,
-             read_length = length(BioSequences.FASTA.sequence(fasta_record)),
-             identifier_length = Int(round(log(read_length)))+3)
+    function observe(fasta_record::FASTX.FASTA.Record;
+                     error_rate::Float64=0.0,
+                     read_length::Int = length(FASTX.sequence(fasta_record)),
+                     identifier_length::Int = Int(round(log(read_length)))+3)
 
-simulate observing a sequence with user-definable options for read length, error rate, and identifier
+Simulate observing a sequence with user-definable options for read length, error rate, and identifier
+
+Error rate is on a 0 (error-free) to 1 (everything is an error) scale
 """
-function observe(fasta_record;
-                 error_rate=0,
-                 read_length = length(BioSequences.FASTA.sequence(fasta_record)),
-                 identifier_length = Int(round(log(read_length)))+3)
-    reference_sequence = BioSequences.FASTA.sequence(fasta_record)
+function observe(fasta_record::FASTX.FASTA.Record;
+                 error_rate::Float64=0.0,
+                 read_length::Int = length(FASTX.sequence(fasta_record)),
+                 identifier_length::Int = Int(round(log(read_length)))+3)
+    @assert 0 <= error_rate <= 1
+    reference_sequence = FASTX.sequence(fasta_record)
     start_index = rand(1:length(reference_sequence)-read_length+1)
     sequence_range = start_index:start_index+read_length-1
     ## should record alignment info here for writing reference alignment information
@@ -80,10 +83,10 @@ function observe(fasta_record;
     if rand([:forward, :reverse_complement]) == :reverse_complement
         reference_sequence_observation = BioSequences.reverse_complement(reference_sequence_observation)
     end
-    if error_rate == 0
+    if error_rate == 0.0
         observed_sequence = reference_sequence_observation
     else
-        observed_sequence = BioSequences.DNASequence()
+        observed_sequence = BioSequences.LongDNASeq()
         for correct_base in reference_sequence_observation
             is_an_error = Bool(rand(Distributions.Bernoulli(error_rate)))
             if is_an_error
@@ -102,7 +105,7 @@ function observe(fasta_record;
         end
     end
     identifier = Random.randstring(identifier_length)
-    return BioSequences.FASTA.Record(identifier, observed_sequence)
+    return FASTX.FASTA.Record(identifier, observed_sequence)
 end
 
 """
@@ -1422,13 +1425,13 @@ function count_canonical_kmers(observations, k)
     # 1) infer nothing and just keep doubling the size of the arrays as we run out of space
     # 2) determine worst-case scenarios, build those arrays, and trim after we're done
     # 3) Read the first 100Mb of data, infer Michaelis-Menton Vmax, and set array size to (double?) that
-    kmer_type = BioSequences.DNAKmer{k}
+    kmer_type = BioSequences.DNAMer{k}
     canonical_kmer_counts = Dict{kmer_type, Int}()
     for observation in observations
-        observed_sequence =  BioSequences.FASTA.sequence(observation)
+        observed_sequence =  FASTX.sequence(observation)
         l = length(observed_sequence)
         l < k && error("length of observed sequence $l is less than k $k")
-        for (index, kmer) in BioSequences.each(kmer_type, observed_sequence)
+        for (index, kmer, reverse_complement_kmer) in BioSequences.each(kmer_type, observed_sequence)
             canonical_kmer = BioSequences.canonical(kmer)
             if haskey(canonical_kmer_counts, canonical_kmer)
                 canonical_kmer_counts[canonical_kmer] += 1
@@ -1437,8 +1440,8 @@ function count_canonical_kmers(observations, k)
             end
         end
     end
-    sorted_canonical_kmer_counts = sort(canonical_kmer_counts)
-    return collect(keys(sorted_canonical_kmer_counts)), collect(values(sorted_canonical_kmer_counts))
+    sorted_canonical_kmer_counts = sort!(collect(canonical_kmer_counts), by=x->x[1])
+    return sorted_canonical_kmer_counts
 end
 
 end
