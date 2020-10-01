@@ -18,6 +18,7 @@ import DataFrames
 # import Dates
 # import Distances
 # import Distributions
+import FASTX
 import GLM
 # for storing VCF format calls
 # import GeneticVariation
@@ -60,12 +61,17 @@ function sequence_to_stranded_path(stranded_kmers, sequence)
 end
 
 """
-document me
+observe(fasta_record;
+             error_rate=0,
+             read_length = length(BioSequences.FASTA.sequence(fasta_record)),
+             identifier_length = Int(round(log(read_length)))+3)
+
+simulate observing a sequence with user-definable options for read length, error rate, and identifier
 """
 function observe(fasta_record;
                  error_rate=0,
                  read_length = length(BioSequences.FASTA.sequence(fasta_record)),
-                 identifier_length = Int(round(log10(read_length)))+11)
+                 identifier_length = Int(round(log(read_length)))+3)
     reference_sequence = BioSequences.FASTA.sequence(fasta_record)
     start_index = rand(1:length(reference_sequence)-read_length+1)
     sequence_range = start_index:start_index+read_length-1
