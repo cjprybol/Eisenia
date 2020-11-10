@@ -48,27 +48,27 @@ const NUCLEOTIDES =
 
 const AMINO_ACIDS = 
     (
-     BioSequences.AA_A,
-     BioSequences.AA_C,
-     BioSequences.AA_D,
-     BioSequences.AA_E,
-     BioSequences.AA_F,
-     BioSequences.AA_G,
-     BioSequences.AA_H,
-     BioSequences.AA_I,
-     BioSequences.AA_K,
-     BioSequences.AA_L,
-     BioSequences.AA_M,
-     BioSequences.AA_N,
-     BioSequences.AA_P,
-     BioSequences.AA_Q,
-     BioSequences.AA_R,
-     BioSequences.AA_S,
-     BioSequences.AA_T,
-     BioSequences.AA_V,
-     BioSequences.AA_W,
-     BioSequences.AA_Y,
-     BioSequences.AA_Term
+    BioSequences.AA_A, # alanine - ala - A (gif, interactive)
+    BioSequences.AA_R, # arginine - arg - R (gif, interactive)
+    BioSequences.AA_N, # asparagine - asn - N (gif, interactive)
+    BioSequences.AA_D, # aspartic acid - asp - D (gif, interactive)
+    BioSequences.AA_C, # cysteine - cys - C (gif, interactive)
+    BioSequences.AA_Q, # glutamine - gln - Q (gif, interactive)
+    BioSequences.AA_E, # glutamic acid - glu - E (gif, interactive)
+    BioSequences.AA_G, # glycine - gly - G (gif, interactive)
+    BioSequences.AA_H, # histidine - his - H (gif, interactive)
+    BioSequences.AA_I, # isoleucine - ile - I (gif, interactive)
+    BioSequences.AA_L, # leucine - leu - L (gif, interactive)
+    BioSequences.AA_K, # lysine - lys - K (gif, interactive)
+    BioSequences.AA_M, # methionine - met - M (gif, interactive)
+    BioSequences.AA_F, # phenylalanine - phe - F (gif, interactive)
+    BioSequences.AA_P, # proline - pro - P (gif, interactive)
+    BioSequences.AA_S, # serine - ser - S (gif, interactive)
+    BioSequences.AA_T, # threonine - thr - T (gif, interactive)
+    BioSequences.AA_W, # tryptophan - trp - W (gif, interactive)
+    BioSequences.AA_Y, # tyrosine - tyr - Y (gif, interactive)
+    BioSequences.AA_V, # valine - val - V (gif, interactive) 
+#      BioSequences.AA_Term
 )
 
 """
