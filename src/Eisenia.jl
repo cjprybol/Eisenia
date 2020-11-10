@@ -46,6 +46,31 @@ const NUCLEOTIDES =
      BioSequences.DNA_G, 
      BioSequences.DNA_T]
 
+const AMINO_ACIDS = 
+    [
+     BioSequences.AA_A,
+     BioSequences.AA_C,
+     BioSequences.AA_D,
+     BioSequences.AA_E,
+     BioSequences.AA_F,
+     BioSequences.AA_G,
+     BioSequences.AA_H,
+     BioSequences.AA_I,
+     BioSequences.AA_K,
+     BioSequences.AA_L,
+     BioSequences.AA_M,
+     BioSequences.AA_N,
+     BioSequences.AA_P,
+     BioSequences.AA_Q,
+     BioSequences.AA_R,
+     BioSequences.AA_S,
+     BioSequences.AA_T,
+     BioSequences.AA_V,
+     BioSequences.AA_W,
+     BioSequences.AA_Y,
+     BioSequences.AA_Term
+]
+
 """
 document me
 """
