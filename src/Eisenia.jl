@@ -41,13 +41,13 @@ import Distributions
 import StatsBase
 
 const NUCLEOTIDES =
-    [BioSequences.DNA_A,
+    (BioSequences.DNA_A,
      BioSequences.DNA_C,
      BioSequences.DNA_G, 
-     BioSequences.DNA_T]
+     BioSequences.DNA_T)
 
 const AMINO_ACIDS = 
-    [
+    (
      BioSequences.AA_A,
      BioSequences.AA_C,
      BioSequences.AA_D,
@@ -69,7 +69,7 @@ const AMINO_ACIDS =
      BioSequences.AA_W,
      BioSequences.AA_Y,
      BioSequences.AA_Term
-]
+)
 
 """
 document me
