@@ -56,13 +56,7 @@ nodes + edges + reads > maximum likelihood reads
 
 repeat until convergence
 
-use jellyfish for kmer counting
-use https://github.com/GATB/bcalm for graph building
 use graph + reads for error correction
-
-use prodigal for annotating orfs
-
-use locus pipeline for annotation
 
 https://genomebiology.biomedcentral.com/articles/10.1186/s13059-018-1554-6
 ```
